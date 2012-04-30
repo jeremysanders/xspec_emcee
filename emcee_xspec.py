@@ -20,6 +20,8 @@ def doMCMC(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
     """Do the actual MCMC process."""
 
     # pool controls xspecs and parameters
+    # this should be a multiprocessing.Pool, but we implement
+    # our own pool as it is much more reliable
     pool = emcee_pool.Pool(xcm, systems)
 
     # make some initial parameters for each walker, based on the xcm
