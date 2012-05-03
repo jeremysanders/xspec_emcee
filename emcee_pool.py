@@ -91,8 +91,8 @@ class Pool(object):
             for control, num in list(self.waitingcontrols.items()):
                 statistic = control.pollStatistic()
                 if statistic is not None:
-                    # save the result (probability is -chi^2)
-                    retnresults[num] = -statistic
+                    # save the result (probability is -chi^2/2)
+                    retnresults[num] = -statistic/2.
                     self.incCount()
 
                     # we're now free for the next job
