@@ -9,6 +9,7 @@ import re
 import sys
 import os.path
 import socket
+import select
 
 thisdir = os.path.dirname(os.path.abspath(__file__))
 
@@ -44,6 +45,10 @@ class XControl(object):
             cmd,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE)
+
+        self.poll = select.poll()
+        self.poll.register(self.xspecsub.stdout.fileno(), select.POLLIN)
+
         self.throwAwayOutput()
         _finishatexit.append(self)
 
@@ -66,11 +71,8 @@ class XControl(object):
     def throwAwayOutput(self):
         """Ignore output from program until no more data available."""
         while True:
-            i, o, e = select.select([self.xspecsub.stdout.fileno()], [], [], 0)
-            if i:
-                t = os.read(i[0], 1024)
-                if not t:  # file was closed
-                    break
+            if self.poll.poll(0):
+                t = os.read(self.xspecsub.stdout.fileno(), 1024)
             else:
                 break
 
@@ -152,9 +154,8 @@ class XControl(object):
     def pollStatistic(self):
         """See whether there is a statistic result."""
  
-        i, o, e = select.select([self.xspecsub.stdout.fileno()], [], [], 0)
-        if i:
-            t = os.read(i[0], 4096)
+        if self.poll.poll(0):
+            t = os.read(self.xspecsub.stdout.fileno(), 4096)
             if not t:  # file was closed
                 return None
         else:
