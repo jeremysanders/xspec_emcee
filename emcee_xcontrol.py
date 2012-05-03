@@ -126,6 +126,9 @@ class XControl(object):
             name = lines.next().split()
             link = lines.next().split()
             vals = [float(x) for x in lines.next().split()]
+            if len(vals) == 1:
+                # switch parameter
+                vals = [vals[0], -1, -1e99, -1e99, 1e99, 1e99]
 
             par = {'index': i+1,
                    'name': name[0],
