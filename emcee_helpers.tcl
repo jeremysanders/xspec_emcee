@@ -31,17 +31,6 @@ proc emcee_interrogate_params {} {
     puts $HDR
 }
 
-# set parameters
-proc emcee_set_params { args } {
-    set length [llength $args]
-
-    model unnamed inactive
-    for { set i 0 } { $i < $length } {incr i 2} {
-	newpar [lindex $args $i] [lindex $args [expr $i+1]]
-    }
-    model unnamed active
-}
-
 # get statistic
 proc emcee_statistic { } {
     global HDR
@@ -66,7 +55,8 @@ proc emcee_loop { } {
 	    tclexit
 	}
 
-	eval emcee_set_params $line
+	puts "running newpar $line"
+	eval newpar $line
 	emcee_statistic
     }
 

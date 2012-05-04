@@ -151,8 +151,22 @@ class XControl(object):
 
     def setParameters(self, paridxs, params):
         """Set parameters in xspec and wait until statistic."""
-        args = ['%i %g' % x for x in zip(paridxs, params)]
-        self.xspecsub.stdin.write( ' '.join(args) + '\n' )
+
+        maxidx = max(*paridxs)
+        cmd = [ "1-%i" % maxidx ]
+
+        paridx = 0
+        pairs = zip(paridxs, params)
+        pairs.sort()
+        for i in xrange(maxidx):
+            if i == pairs[paridx][0]-1:
+                cmd.append(str(pairs[paridx][1]))
+                paridx += 1
+            else:
+                cmd.append('')
+
+        text = ' & '.join(cmd)
+        self.xspecsub.stdin.write( text + '\n' )
 
     def pollStatistic(self):
         """See whether there is a statistic result."""
