@@ -118,7 +118,7 @@ class XspecPool(subprocessing.Pool):
         """Is the result in the output?"""
         match = result_re.search(text)
         if match:
-            statistic = float( match.group(1).split()[0] )
+            statistic = float( match.group(1) )
             if statistic < 0:
                 return -N.inf
             else:

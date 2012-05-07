@@ -60,7 +60,7 @@ proc emcee_loop { } {
 	if { $line == "returnerror" } {
 	    # this is evil - asked to return an error status because
 	    # the parameters were originally out
-	    puts "$HDR -1 -1 $HDR"
+	    puts "$HDR -1 $HDR"
 	    continue
 	}
 
