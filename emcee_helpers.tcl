@@ -2,6 +2,7 @@
 # Jeremy Sanders 2012
 
 set HDR "@@EMCEE@@"
+set EMCEE_DEBUG 0
 
 # startup
 proc emcee_startup {} {
@@ -40,6 +41,9 @@ proc emcee_statistic { } {
 # loop taking parameters and returning results
 # exits when quit is entered or stdin closes
 proc emcee_loop { } {
+    global EMCEE_DEBUG
+    global HDR
+
     fconfigure stdin -buffering line
     fconfigure stdout -buffering line
 
@@ -50,17 +54,24 @@ proc emcee_loop { } {
 	if { [eof stdin] } {
 	    tclexit
 	}
-
 	if { $line == "quit" } {
 	    tclexit
 	}
+	if { $line == "returnerror" } {
+	    # this is evil - asked to return an error status because
+	    # the parameters were originally out
+	    puts "$HDR -1 -1 $HDR"
+	    continue
+	}
 
-	puts "running newpar $line"
+	if { $EMCEE_DEBUG } {
+	    puts "Doing: newpar $line"
+	}
 	eval newpar $line
 	emcee_statistic
+
     }
 
 }
 
 emcee_startup
-

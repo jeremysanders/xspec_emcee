@@ -13,7 +13,7 @@ import argparse
 import numpy as N
 import emcee
 
-import emcee_pool
+import xspec_pool
 
 def doMCMC(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
            outchain = 'out.dat'):
@@ -22,7 +22,7 @@ def doMCMC(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
     # pool controls xspecs and parameters
     # this should be a multiprocessing.Pool, but we implement
     # our own pool as it is much more reliable
-    pool = emcee_pool.Pool(xcm, systems)
+    pool = xspec_pool.XspecPool(xcm, systems)
 
     # make some initial parameters for each walker, based on the xcm
     # file and adding on some randomness
@@ -35,16 +35,18 @@ def doMCMC(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
     sampler = emcee.EnsembleSampler(nwalkers, len(parvals), None,
                                     pool=pool)
 
-    # burn in
-    pos, prob, state = sampler.run_mcmc(p0, nburn)
-    sampler.reset()
-
-    # run for real
-    sampler.run_mcmc(pos, niters, rstate0=state)
+    if nburn > 0:
+        # burn in
+        pos, prob, state = sampler.run_mcmc(p0, nburn)
+        sampler.reset()
+        # run for real
+        sampler.run_mcmc(pos, niters, rstate0=state)
+    else:
+        sampler.run_mcmc(p0, niters)
 
     print "Writing", outchain
     writeXSpecChain(outchain, sampler.chain,
-                    sampler.lnprobability, pool.params, pool.paridxs)
+                    sampler.lnprobability, pool.parlist, pool.paridxs)
 
     return sampler
 
@@ -67,7 +69,7 @@ def writeXSpecChain(filename, chain, lnprob, params, paridxs):
         hdr.append("Chi-Squared")
         f.write('!%s\n' % ' '.join(hdr))
 
-        for w, walker in enumerate(N.dstack((chain, N.expand_dims(-lnprob, 2)))):
+        for w, walker in enumerate(N.dstack((chain, N.expand_dims(-lnprob*2, 2)))):
             #f.write('! walker %i\n' % i)
             for line in walker:
                 fmt = '\t'.join(['%g']*len(line))
