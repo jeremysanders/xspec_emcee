@@ -1,0 +1,61 @@
+XSPEC_EMCEE
+-----------
+
+This is a program to use emcee to do MCMC analyses of X-ray spectra in
+xspec.
+
+** Please acknowledge use of this code by Jeremy Sanders in any
+publications. **
+
+As described on their website, emcee is an extensible, pure-Python
+implementation of of Goodman & Weare's Affine Invariant Markov chain
+Monte Carlo (MCMC) Ensemble sampler.
+
+REQUIREMENTS:
+
+Python: Preferably 2.7 <= version < 3, but 2.5 or 2.6 should work
+emcee: http://danfm.ca/emcee/
+xspec: http://heasarc.nasa.gov/xanadu/xspec/
+argparse: http://pypi.python.org/pypi/argparse (for Python < 2.7)
+
+USAGE:
+
+The program will run on an input XCM file (loading data+model). It
+writes out an xspec-compatible chain file, plus a numpy data file. You
+just need to choose the number of iterations, length of burn in period
+and number of walkers. Remember that the for every iteration you get
+the number of walkers points in the output chain file. The chains from
+the walkers are flattened in the output .chain file.
+
+The program can run multiple copies of xspec simultaneously. By
+default it runs one copy on a local machine. You can run multiple
+copies using --systems="localhost localhost", etc. locahost specifies
+running on the local system. You can run remote copies over ssh by
+using a different system name. Note that you will probably need to
+edit start_xspec.sh for non-remote systems to run appropriate
+initialisation files.
+
+xpc1:~/code/xspec/emcee:$ ./xspec_emcee.py --help
+usage: xspec_emcee.py [-h] [--niters N] [--nburn N] [--nwalkers N]
+                      [--systems LIST] [--output-npz FILE]
+                      [--output-chain FILE]
+                      XCM
+
+Xspec MCMC with EMCEE. Jeremy Sanders 2012.
+
+positional arguments:
+  XCM                  Input XCM file
+
+optional arguments:
+  -h, --help           show this help message and exit
+  --niters N           Number of iterations (default: 5000)
+  --nburn N            Number of burn iterations (default: 500)
+  --nwalkers N         Number of walkers (default: 50)
+  --systems LIST       Space separated list of systems to run on (default:
+                       localhost)
+  --output-npz FILE    Output NPZ file (default: emcee.npz)
+  --output-chain FILE  Output text file (default: emcee.chain)
+
+TODO:
+ - Write out chain file incrementally?
+ - Use local xspec to find remote xspecs automatically?
