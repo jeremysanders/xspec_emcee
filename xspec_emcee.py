@@ -16,13 +16,13 @@ import emcee
 import xspec_pool
 
 def doMCMC(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
-           outchain = 'out.dat'):
+           outchain = 'out.dat', debug=False):
     """Do the actual MCMC process."""
 
     # pool controls xspecs and parameters
     # this should be a multiprocessing.Pool, but we implement
     # our own pool as it is much more reliable
-    pool = xspec_pool.XspecPool(xcm, systems)
+    pool = xspec_pool.XspecPool(xcm, systems, debug=debug)
 
     # make some initial parameters for each walker, based on the xcm
     # file and adding on some randomness
@@ -96,6 +96,8 @@ def main():
                    help="Output NPZ file")
     p.add_argument("--output-chain", default="emcee.chain", metavar="FILE",
                    help="Output text file")
+    p.add_argument("--debug", action="store_true", default=False,
+                   help="Create xspec log files")
 
     args = p.parse_args()
 
@@ -106,6 +108,7 @@ def main():
                       nburn = args.nburn,
                       niters = args.niters,
                       outchain = args.output_chain,
+                      debug = args.debug,
                       )
 
     print "Writing", args.output_npz

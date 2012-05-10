@@ -57,6 +57,10 @@ proc emcee_loop { } {
 
 	set line [gets stdin]
 
+	if { $EMCEE_DEBUG } {
+	    puts "Debug: $line"
+	}
+
 	if { [eof stdin] } {
 	    tclexit
 	}
@@ -70,12 +74,8 @@ proc emcee_loop { } {
 	    continue
 	}
 
-	if { $EMCEE_DEBUG } {
-	    puts "Doing: newpar $line"
-	}
 	eval newpar $line
 	emcee_statistic
-
     }
 
 }

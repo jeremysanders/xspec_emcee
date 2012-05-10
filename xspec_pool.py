@@ -7,8 +7,6 @@ import numpy as N
 
 import subprocessing
 
-dologging = False
-
 # script to start xspec
 thisdir = os.path.dirname( os.path.abspath(__file__) )
 start_xspec = os.path.join(thisdir, 'start_xspec.sh')
@@ -19,9 +17,10 @@ xspec_helpers = os.path.join(thisdir, 'emcee_helpers.tcl')
 result_re = re.compile(r'@@EMCEE@@\s*(.*?)\s*@@EMCEE@@', flags=re.DOTALL)
 
 class XspecPool(subprocessing.Pool):
-    def __init__(self, xcm, systems):
+    def __init__(self, xcm, systems, debug=False):
         cmds = [ [start_xspec, system] for system in systems ]
         self.xcm = os.path.abspath(xcm)
+        self.debug = debug
 
         # start up processes
         subprocessing.Pool.__init__(self, cmds)
@@ -98,7 +97,7 @@ class XspecPool(subprocessing.Pool):
         # load helper routines
         popen.stdin.write('source %s\n' % xspec_helpers)
 
-        if dologging:
+        if self.debug:
             popen.stdin.write('set logfile '
                               '$env(HOME)/xspec.log.[info hostname].[pid]\n')
             popen.stdin.write('file delete $logfile\n')
