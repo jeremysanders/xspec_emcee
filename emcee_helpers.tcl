@@ -17,9 +17,15 @@ proc emcee_interrogate_params {} {
     puts $HDR
 
     # return component information
-    puts [tcloutr modcomp]
-    for {set i 1} {$i <= [tcloutr modcomp]} {incr i} {
-	puts [tcloutr compinfo $i]
+    #  number of components * number of datagroups
+    puts [ expr [tcloutr modcomp]*[tcloutr datagrp] ]
+
+    #  loop over data groups
+    for {set dg 1} {$dg <= [tcloutr datagrp]} {incr dg} {
+	#  loop over components
+	for {set c 1} {$c <= [tcloutr modcomp]} {incr c} {
+	   puts [tcloutr compinfo $c $dg]
+	}
     }
 
     # return parameter information
