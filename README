@@ -13,32 +13,39 @@ Monte Carlo (MCMC) Ensemble sampler.
 
 REQUIREMENTS:
 
-Python: Preferably 2.7 <= version < 3, but 2.5 or 2.6 should work
-emcee: http://danfm.ca/emcee/
-xspec: http://heasarc.nasa.gov/xanadu/xspec/
+Python:   2.x  (2.5 or better)
 argparse: http://pypi.python.org/pypi/argparse (for Python < 2.7)
+emcee:    http://danfm.ca/emcee/
+xspec:    http://heasarc.nasa.gov/xanadu/xspec/
 
 USAGE:
 
-The program will run on an input XCM file (loading data+model). It
-writes out an xspec-compatible chain file, plus a numpy data file. You
-just need to choose the number of iterations, length of burn in period
-and number of walkers. Remember that the for every iteration you get
-the number of walkers points in the output chain file. The chains from
-the walkers are flattened in the output .chain file.
+The program will run using an input XCM file (loading data+model). It
+writes out an xspec-compatible chain file, plus a numpy npz data file
+containing the chains, probabilities and acceptance fractions.
+
+You need to choose the number of iterations, length of burn in period
+and number of walkers. Remember that for every iteration you get the
+number of walkers points in the output chain file. The chains from the
+walkers are flattened in the output .chain file, with all the results
+from one walker, followed by the next.
 
 The program can run multiple copies of xspec simultaneously. By
 default it runs one copy on a local machine. You can run multiple
-copies using --systems="localhost localhost", etc. locahost specifies
-running on the local system. You can run remote copies over ssh by
-using a different system name. Note that you will probably need to
-edit start_xspec.sh for non-remote systems to run appropriate
-initialisation files.
+copies by providing a list of systems with the --systems option. The
+name localhost runs on the local system without ssh. For instance
+--systems="localhost localhost" runs two local copies of xspec. You
+can run remote copies over ssh by using a different system name. Note
+that you will probably need to edit start_xspec.sh for non-remote
+systems to run appropriate initialisation files.
 
-xpc1:~/code/xspec/emcee:$ ./xspec_emcee.py --help
+The program prints out the number of times the xspec model has been
+evaluated as it runs.
+
+$ ./xspec_emcee.py --help
 usage: xspec_emcee.py [-h] [--niters N] [--nburn N] [--nwalkers N]
                       [--systems LIST] [--output-npz FILE]
-                      [--output-chain FILE]
+                      [--output-chain FILE] [--debug]
                       XCM
 
 Xspec MCMC with EMCEE. Jeremy Sanders 2012.
@@ -55,7 +62,8 @@ optional arguments:
                        localhost)
   --output-npz FILE    Output NPZ file (default: emcee.npz)
   --output-chain FILE  Output text file (default: emcee.chain)
+  --debug              Create xspec log files (default: False)
 
 TODO:
- - Write out chain file incrementally?
+ - Write out chain file incrementally? Chain file is written at end.
  - Use local xspec to find remote xspecs automatically?
