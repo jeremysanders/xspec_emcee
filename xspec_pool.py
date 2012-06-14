@@ -2,6 +2,7 @@ import os
 import os.path
 import re
 import itertools
+import time
 
 import numpy as N
 
@@ -107,6 +108,8 @@ class XspecPool(subprocessing.Pool):
         # load xcm in current directory
         popen.stdin.write('cd %s\n' % os.path.dirname(self.xcm))
         popen.stdin.write('@%s\n' % os.path.basename(self.xcm))
+
+        time.sleep(0.5)
 
     def close_subprocess(self, popen):
         """Tell loop to exit."""
