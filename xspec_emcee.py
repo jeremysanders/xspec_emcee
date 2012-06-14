@@ -28,7 +28,7 @@ def doMCMC(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
     # file and adding on some randomness
     parvals = N.array(pool.parvals)
     # use 1% of parameter initially, or 0.01 if zero
-    parerrs = N.where( parvals == 0., 0.01, parvals * 0.01 )
+    parerrs = N.where( parvals == 0., 0.001, parvals * 0.001 )
     p0 = [ N.random.normal(parvals, parerrs) for i in xrange(nwalkers) ]
 
     # sample the mcmc
