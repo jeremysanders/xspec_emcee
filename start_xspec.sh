@@ -9,5 +9,5 @@ host=$1
 if [ $host == localhost ]; then
     exec xspec
 else
-    exec ssh -x $host "source /etc/profile; do_xray_profile; exec xspec"
+    exec ssh -c arcfour -x $host "source /etc/profile; do_xray_profile; exec xspec"
 fi
