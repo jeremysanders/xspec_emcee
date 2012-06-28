@@ -23,7 +23,13 @@ def getInitialParameters(parameters, nwalkers):
         # for each walker, use initial parameters based on parameter
         # and delta parameter
         for par in parameters:
-            v = N.random.normal(par['val_init'], par['val_delta'])
+            width = par['val_delta']
+            swidth = par['val_sigma']*0.1
+            if swidth > 0 and swidth < width:
+                # use sigma if delta is badly adjusted
+                width = swidth
+
+            v = N.random.normal(par['val_init'], width)
             # clip to hard range
             v = N.clip(v, par['val_hardmin'], par['val_hardmax'])
             pwalker.append(v)

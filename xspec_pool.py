@@ -70,6 +70,7 @@ class XspecPool(subprocessing.Pool):
             if len(vals) == 1:
                 # switch parameter
                 vals = [vals[0], -1, -1e99, -1e99, 1e99, 1e99]
+            sigma = float(lines.next())
 
             par = {'index': i+1,
                    'name': name[0],
@@ -81,6 +82,7 @@ class XspecPool(subprocessing.Pool):
                    'val_softmin': vals[3],
                    'val_softmax': vals[4],
                    'val_hardmax': vals[5],
+                   'val_sigma': sigma,
                    'cmpt': cmpts[i+1]}
             parlist.append(par)
 

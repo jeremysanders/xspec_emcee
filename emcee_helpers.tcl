@@ -16,6 +16,9 @@ proc emcee_interrogate_params {} {
     global HDR
     puts $HDR
 
+    query no
+    fit 100
+
     # return component information
     #  number of components * number of datagroups
     puts [ expr [tcloutr modcomp]*[tcloutr datagrp] ]
@@ -34,6 +37,7 @@ proc emcee_interrogate_params {} {
 	puts [tcloutr pinfo $i]
 	puts [tcloutr plink $i]
 	puts [tcloutr param $i]
+	puts [tcloutr sigma $i]
     }
     puts $HDR
 }
