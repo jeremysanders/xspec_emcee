@@ -11,12 +11,6 @@ As described on their website, emcee is an extensible, pure-Python
 implementation of of Goodman & Weare's Affine Invariant Markov chain
 Monte Carlo (MCMC) Ensemble sampler.
 
-The walkers are started clustered around the parameters of the XCM
-file given, using the delta value of the parameter as the width of a
-normal distribution (clipped to the hard bounds of the parameter
-range). Make sure that the delta values of parameters are set to
-values smaller than the uncertainties on each parameter.
-
 REQUIREMENTS:
 
 Python:   2.x  (2.5 or better)
@@ -35,6 +29,18 @@ and number of walkers. Remember that for every iteration you get the
 number of walkers points in the output chain file. The chains from the
 walkers are flattened in the output .chain file, with all the results
 from one walker, followed by the next.
+
+The walkers are started clustered around the parameters of the XCM
+file given, using the delta value of the parameter as the width of a
+normal distribution (clipped to the hard bounds of the parameter
+range).  Make sure that the delta values of parameters are set to
+values smaller than the uncertainties on each parameter. Note,
+however, that xspec_emcee will do a fit on the model, and if the 0.1 *
+sigma of the parameter (as calculated from the covariance matrix) is
+bigger than this delta, then 0.1 * sigma is used instead. This is a
+safety mechanism as xspec has poorly chosen deltas for some inbuilt
+models. We don't always use sigma, as it can be very wrong (usually
+too large).
 
 The program can run multiple copies of xspec simultaneously. By
 default it runs one copy on a local machine. You can run multiple
@@ -73,3 +79,4 @@ optional arguments:
 TODO:
  - Write out chain file incrementally? Chain file is written at end.
  - Use local xspec to find remote xspecs automatically?
+ - Checkpoint and restart, extending chain
