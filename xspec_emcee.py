@@ -15,6 +15,21 @@ import emcee
 
 import xspec_pool
 
+def getInitialParameters(parameters, nwalkers):
+    """Construct list of initial parameter values for each walker."""
+    p0 = []
+    for walker in xrange(nwalkers):
+        pwalker = []
+        # for each walker, use initial parameters based on parameter
+        # and delta parameter
+        for par in parameters:
+            v = N.random.normal(par['val_init'], par['val_delta'])
+            # clip to hard range
+            v = N.clip(v, par['val_hardmin'], par['val_hardmax'])
+            pwalker.append(v)
+        p0.append( N.array(pwalker) )
+    return p0
+
 def doMCMC(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
            outchain = 'out.dat', debug=False):
     """Do the actual MCMC process."""
@@ -24,16 +39,10 @@ def doMCMC(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
     # our own pool as it is much more reliable
     pool = xspec_pool.XspecPool(xcm, systems, debug=debug)
 
-    # make some initial parameters for each walker, based on the xcm
-    # file and adding on some randomness
-    parvals = N.array(pool.parvals)
-    # use 1% of parameter initially, or 0.01 if zero
-    parerrs = N.where( parvals == 0., 0.001, parvals * 0.001 )
-    p0 = [ N.random.normal(parvals, parerrs) for i in xrange(nwalkers) ]
+    p0 = getInitialParameters(pool.parameters, nwalkers)
 
     # sample the mcmc
-    sampler = emcee.EnsembleSampler(nwalkers, len(parvals), None,
-                                    pool=pool)
+    sampler = emcee.EnsembleSampler(nwalkers, len(p0[0]), None, pool=pool)
 
     if nburn > 0:
         # burn in

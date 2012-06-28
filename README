@@ -11,6 +11,12 @@ As described on their website, emcee is an extensible, pure-Python
 implementation of of Goodman & Weare's Affine Invariant Markov chain
 Monte Carlo (MCMC) Ensemble sampler.
 
+The walkers are started clustered around the parameters of the XCM
+file given, using the delta value of the parameter as the width of a
+normal distribution (clipped to the hard bounds of the parameter
+range). Make sure that the delta values of parameters are set to
+values smaller than the uncertainties on each parameter.
+
 REQUIREMENTS:
 
 Python:   2.x  (2.5 or better)

@@ -87,10 +87,12 @@ class XspecPool(subprocessing.Pool):
         # identify unlinked and unfrozen parameters
         self.paridxs = []   # indices
         self.parvals = []   # values
+        self.parameters = []   # full details of parameter
         for par in parlist:
             if not par['linked'] and par['val_delta'] > 0.:
                 self.paridxs.append(par['index'])
                 self.parvals.append(par['val_init'])
+                self.parameters.append(par)
 
     def init_subprocess(self, popen):
         """Initialise the xspec process given."""
