@@ -126,9 +126,15 @@ class XspecPool(subprocessing.Pool):
         if match:
             statistic = float( match.group(1) )
             if statistic < 0:
-                return -N.inf
+                val = -N.inf
             else:
-                return -statistic * 0.5
+                val = -statistic * 0.5
+
+            if self.count % 100 == 0:
+                print '%10i %10.2f' % (self.count, val)
+            self.count += 1
+
+            return val
         return None
 
     def in_bounds(self, params):
@@ -143,10 +149,6 @@ class XspecPool(subprocessing.Pool):
 
     def send_parameters(self, stdin, params):
         """Send parameters to process."""
-
-        if self.count % 100 == 0:
-            print self.count
-        self.count += 1
 
         if not self.in_bounds(params):
             # tell process to retn error to ourselves!
