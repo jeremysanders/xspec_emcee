@@ -52,12 +52,17 @@ that you will probably need to edit start_xspec.sh for non-remote
 systems to run appropriate initialisation files.
 
 The program prints out the number of times the xspec model has been
-evaluated as it runs.
+evaluated as it runs (and the probability value -statistic/2).
+
+The program will save the contents of the chain and probabilities to
+the npz every 10 minutes after the burn-in period. Pressing Ctrl+C
+will also save the current state of the chain and exit. The chain can
+be continued with the --continue-run option.
 
 $ ./xspec_emcee.py --help
 usage: xspec_emcee.py [-h] [--niters N] [--nburn N] [--nwalkers N]
                       [--systems LIST] [--output-npz FILE]
-                      [--output-chain FILE] [--debug]
+                      [--output-chain FILE] [--continue-run] [--debug]
                       XCM
 
 Xspec MCMC with EMCEE. Jeremy Sanders 2012.
@@ -74,9 +79,9 @@ optional arguments:
                        localhost)
   --output-npz FILE    Output NPZ file (default: emcee.npz)
   --output-chain FILE  Output text file (default: emcee.chain)
+  --continue-run       Continue from an existing chain (in npz) (default:
+                       False)
   --debug              Create xspec log files (default: False)
 
 TODO:
- - Write out chain file incrementally? Chain file is written at end.
  - Use local xspec to find remote xspecs automatically?
- - Checkpoint and restart, extending chain
