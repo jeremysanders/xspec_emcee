@@ -36,8 +36,15 @@ proc emcee_interrogate_params {} {
     for {set i 1} {$i <= [tcloutr modpar]} {incr i} {
 	puts [tcloutr pinfo $i]
 	puts [tcloutr plink $i]
-	puts [tcloutr param $i]
-	puts [tcloutr sigma $i]
+	if { [llength [tcloutr param $i]] > 1 } {
+	    puts [tcloutr param $i]
+	    puts [tcloutr sigma $i]
+	} else {
+	    # switch parameters only return a single value and return
+	    # an error for tcloutr sigma, so work around this
+	    puts "[tcloutr param $i] -1 -1e30 -1e30 1e30 1e30"
+	    puts "-1"
+	}
     }
     puts $HDR
 }
