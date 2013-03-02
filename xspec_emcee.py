@@ -93,7 +93,7 @@ def doMCMC(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
     index = start
     try:
         for p, l, s in sampler.sample(
-            pos, randomstate=state, storechain=False,
+            pos, rstate0=state, storechain=False,
             iterations=niters-start):
 
             chain[:, index, :] = p
