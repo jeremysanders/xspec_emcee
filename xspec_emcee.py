@@ -38,14 +38,15 @@ def getInitialParameters(parameters, nwalkers):
     return p0
 
 def doMCMC(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
-           outchain = 'out.dat', outnpz = 'out.npz', debug=False,
-           continuerun = False, autosave = True):
+           outchain='out.dat', outnpz='out.npz', debug=False,
+           continuerun=False, autosave=True,
+           nochdir=False):
     """Do the actual MCMC process."""
 
     # pool controls xspecs and parameters
     # this should be a multiprocessing.Pool, but we implement
     # our own pool as it is much more reliable
-    pool = xspec_pool.XspecPool(xcm, systems, debug=debug)
+    pool = xspec_pool.XspecPool(xcm, systems, debug=debug, nochdir=nochdir)
 
     p0 = getInitialParameters(pool.parameters, nwalkers)
     ndims = len(p0[0])
@@ -179,6 +180,8 @@ def main():
                    help="Continue from an existing chain (in npz)")
     p.add_argument("--debug", action="store_true", default=False,
                    help="Create xspec log files")
+    p.add_argument("--no-chdir", action="store_true", default=False,
+                   help="Do not chdir to xcm file directory before execution")
 
     args = p.parse_args()
 
@@ -192,6 +195,7 @@ def main():
                       outnpz = args.output_npz,
                       continuerun = args.continue_run,
                       debug = args.debug,
+                      nochdir = args.no_chdir
                       )
 
     print "Done"

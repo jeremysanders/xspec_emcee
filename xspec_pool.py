@@ -18,10 +18,11 @@ xspec_helpers = os.path.join(thisdir, 'emcee_helpers.tcl')
 result_re = re.compile(r'@@EMCEE@@\s*(.*?)\s*@@EMCEE@@', flags=re.DOTALL)
 
 class XspecPool(subprocessing.Pool):
-    def __init__(self, xcm, systems, debug=False):
+    def __init__(self, xcm, systems, debug=False, nochdir=False):
         cmds = [ [start_xspec, system] for system in systems ]
         self.xcm = os.path.abspath(xcm)
         self.debug = debug
+        self.nochdir = nochdir
 
         # start up processes
         subprocessing.Pool.__init__(self, cmds)
@@ -107,8 +108,11 @@ class XspecPool(subprocessing.Pool):
             popen.stdin.write('set EMCEE_DEBUG 1\n')
 
         # load xcm in current directory
-        popen.stdin.write('cd %s\n' % os.path.dirname(self.xcm))
-        popen.stdin.write('@%s\n' % os.path.basename(self.xcm))
+        if self.nochdir:
+            popen.stdin.write('@%s\n' % self.xcm)
+        else:
+            popen.stdin.write('cd %s\n' % os.path.dirname(self.xcm))
+            popen.stdin.write('@%s\n' % os.path.basename(self.xcm))
 
         time.sleep(0.5)
 
