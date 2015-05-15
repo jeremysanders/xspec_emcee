@@ -1,12 +1,15 @@
+from __future__ import print_function, division
+
 import os
 import os.path
 import re
 import itertools
 import time
+import atexit
+import subprocess
+import select
 
 import numpy as N
-
-import subprocessing
 
 # script to start xspec
 thisdir = os.path.dirname( os.path.abspath(__file__) )
@@ -17,18 +20,23 @@ xspec_helpers = os.path.join(thisdir, 'emcee_helpers.tcl')
 # get result (stripped of whitespace)
 result_re = re.compile(r'@@EMCEE@@\s*(.*?)\s*@@EMCEE@@', flags=re.DOTALL)
 
-class XspecPool(subprocessing.Pool):
+class XspecPool(object):
     def __init__(self, xcm, systems, debug=False, nochdir=False):
         cmds = [ [start_xspec, system] for system in systems ]
         self.xcm = os.path.abspath(xcm)
         self.debug = debug
         self.nochdir = nochdir
 
-        # start up processes
-        subprocessing.Pool.__init__(self, cmds)
+        # list of open subprocesses
+        self.popens = []
+        self.buffers = {}
+        for cmd in [ [start_xspec, system] for system in systems ]:
+            self.popens.append(self.init_subprocess(cmd))
+            self.buffers[self.popens[-1]] = ''
+        atexit.register(self.finish)
 
         # get parameters for xcm model
-        self._get_params()
+        self.get_params()
 
         # enter execution loop
         for popen in self.popens:
@@ -37,7 +45,18 @@ class XspecPool(subprocessing.Pool):
         # feedback
         self.count = 0
 
-    def _get_params(self):
+    def finish(self):
+        """Finish all processes."""
+        # tell processes to finish
+        for p in self.popens:
+            p.stdin.write('quit\n')
+            p.stdin.close()
+        # wait until they have closed
+        for p in self.popens:
+            p.wait()
+        del self.popens[:]
+
+    def get_params(self):
         """Get list of parameters from first process."""
         p = self.popens[0]
 
@@ -88,14 +107,24 @@ class XspecPool(subprocessing.Pool):
         self.paridxs = []   # indices
         self.parvals = []   # values
         self.parameters = []   # full details of parameter
+        self.hardmin = []
+        self.hardmax = []
         for par in parlist:
             if not par['linked'] and par['val_delta'] > 0.:
                 self.paridxs.append(par['index'])
                 self.parvals.append(par['val_init'])
+                self.hardmin.append(par['val_hardmin'])
+                self.hardmax.append(par['val_hardmax'])
                 self.parameters.append(par)
+        self.hardmin = N.array(self.hardmin)
+        self.hardmax = N.array(self.hardmax)
+        self.maxidx = max(*self.paridxs)
 
-    def init_subprocess(self, popen):
+    def init_subprocess(self, cmd):
         """Initialise the xspec process given."""
+
+        popen = subprocess.Popen(
+            cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
         # load helper routines
         popen.stdin.write('source %s\n' % xspec_helpers)
@@ -115,59 +144,80 @@ class XspecPool(subprocessing.Pool):
             popen.stdin.write('@%s\n' % os.path.basename(self.xcm))
 
         time.sleep(0.5)
+        return popen
 
-    def close_subprocess(self, popen):
-        """Tell loop to exit."""
-        popen.stdin.write('quit\n')
-        subprocessing.Pool.close_subprocess(self, popen)
-
-    def identify_lnprob(self, text):
-        """Is the result in the output?"""
-        match = result_re.search(text)
-        if match:
-            statistic = float( match.group(1) )
-            if statistic < 0:
-                val = -N.inf
-            else:
-                val = -statistic * 0.5
-
-            if self.count % 100 == 0:
-                print '%10i %10.2f' % (self.count, val)
-            self.count += 1
-
-            return val
-        return None
-
-    def in_bounds(self, params):
-        """Are the parameters in bounds?"""
-
-        # return no probability if out of bounds
-        for pidx, pval in itertools.izip(self.paridxs, params):
-            xp = self.parlist[pidx-1]
-            if pval < xp['val_hardmin'] or pval > xp['val_hardmax']:
-                return False
-        return True
-
-    def send_parameters(self, stdin, params):
+    def get_parameters(self, params):
         """Send parameters to process."""
-
-        if not self.in_bounds(params):
-            # tell process to retn error to ourselves!
-            stdin.write('returnerror\n')
+        if N.any(params < self.hardmin) or N.any(params > self.hardmax):
+            return None
         else:
             # set the parameters and await result
-            maxidx = max(*self.paridxs)
-            cmd = [ "1-%i" % maxidx ]
+            cmd = ["1-%i" % self.maxidx] + [""]*self.maxidx
+            for i, p in itertools.izip(self.paridxs, params):
+                cmd[i] = str(p)
+            return " & ".join(cmd)
 
-            paridx = 0
-            pairs = zip(self.paridxs, params)
-            pairs.sort()
-            for i in xrange(maxidx):
-                if i == pairs[paridx][0]-1:
-                    cmd.append(str(pairs[paridx][1]))
-                    paridx += 1
-                else:
-                    cmd.append('')
+    def map(self, function, paramlist):
+        """Return a list of lnprob values for the list parameter sets
+        given.
 
-            text = ' & '.join(cmd)
-            stdin.write( text + '\n' )
+        Note: function is never called!
+        """
+
+        # convert parameters to text
+        retn = N.zeros(len(paramlist), dtype=N.float64)*N.nan
+        numbers = []
+        params = []
+        for i, p in enumerate(paramlist):
+            ptext = self.get_parameters(p)
+            if ptext is None:
+                retn[i] = -1
+            else:
+                params.append(ptext)
+                numbers.append(i)
+
+        chunksize = 4
+
+        free = range(len(self.popens))
+        waiting = {}
+
+        while len(params) > 0 or len(waiting) > 0:
+            # send off parameters to any waiting processes
+            while free and len(params)>0:
+                idx = free.pop()
+                popen = self.popens[idx]
+                chunk = params[:chunksize]
+                chunkparams = ' '.join('{%s}' % p for p in chunk)
+                popen.stdin.write('batch %s\n' % chunkparams)
+                waiting[popen.stdout.fileno()] = (idx, popen, numbers[:chunksize])
+                params = params[chunksize:]
+                numbers = numbers[chunksize:]
+
+            # have any finished processing?
+            stdouts = select.select(waiting.keys(), [], [])[0]
+            for stdout in stdouts:
+                idx, popen, pnumbers = waiting[stdout]
+                self.buffers[popen] += os.read(stdout, 4096)
+                match = result_re.search(self.buffers[popen])
+                if match:
+                    results = match.group(1)
+                    results = N.fromstring(results, dtype=N.float64, sep=' ')
+                    retn[pnumbers] = results
+                    self.buffers[popen] = ''
+                    free.append(idx)
+                    del waiting[stdout]
+
+        assert N.all(N.isfinite(retn))
+
+        resfilt = retn[retn > 0]
+        if len(resfilt) > 0 and self.count % 2 == 0:
+            print('%5i   mean=<%9.1f> min=<%9.1f> bad=<%4i/%4i>' % (
+                    self.count // 2, resfilt.mean(), resfilt.min(),
+                    N.sum((retn<0).astype(N.intc)), len(retn),
+                    ))
+        self.count += 1
+
+        lnprob = retn*-0.5
+        lnprob[lnprob>0] = -N.inf
+
+        return lnprob

@@ -35,12 +35,12 @@ def getInitialParameters(parameters, nwalkers):
             v = N.clip(v, par['val_hardmin'], par['val_hardmax'])
             pwalker.append(v)
         p0.append( N.array(pwalker) )
-    return p0
+    return N.array(p0)
 
 def doMCMC(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
            outchain='out.dat', outnpz='out.npz', debug=False,
            continuerun=False, autosave=True,
-           nochdir=False):
+           nochdir=False, initialparameters=None):
     """Do the actual MCMC process."""
 
     # pool controls xspecs and parameters
@@ -48,8 +48,13 @@ def doMCMC(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
     # our own pool as it is much more reliable
     pool = xspec_pool.XspecPool(xcm, systems, debug=debug, nochdir=nochdir)
 
-    p0 = getInitialParameters(pool.parameters, nwalkers)
-    ndims = len(p0[0])
+    if not initialparameters:
+        p0 = getInitialParameters(pool.parameters, nwalkers)
+    else:
+        print "Loading initial parameters from", initialparameters
+        p0 = N.loadtxt(initialparameters)
+
+    ndims = p0.shape[1]
 
     # sample the mcmc
     sampler = emcee.EnsembleSampler(nwalkers, ndims, None, pool=pool)
@@ -182,6 +187,8 @@ def main():
                    help="Create xspec log files")
     p.add_argument("--no-chdir", action="store_true", default=False,
                    help="Do not chdir to xcm file directory before execution")
+    p.add_argument("--initial-parameters", metavar="FILE",
+                   help="Provide initial parameters")
 
     args = p.parse_args()
 
@@ -195,7 +202,8 @@ def main():
                       outnpz = args.output_npz,
                       continuerun = args.continue_run,
                       debug = args.debug,
-                      nochdir = args.no_chdir
+                      nochdir = args.no_chdir,
+                      initialparameters = args.initial_parameters,
                       )
 
     print "Done"

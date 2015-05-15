@@ -55,6 +55,16 @@ proc emcee_statistic { } {
     puts "$HDR [tcloutr stat] $HDR"
 }
 
+proc emcee_batch { pars } {
+    global HDR
+    set stats ""
+    foreach p $pars {
+        eval newpar $p
+        lappend stats [tcloutr stat]
+    }
+    puts "$HDR $stats $HDR"
+}
+
 # loop taking parameters and returning results
 # exits when quit is entered or stdin closes
 proc emcee_loop { } {
@@ -65,30 +75,28 @@ proc emcee_loop { } {
     fconfigure stdout -buffering line
 
     while { 1 } {
-
 	set line [gets stdin]
 
-	if { $EMCEE_DEBUG } {
+        if { $EMCEE_DEBUG } {
 	    puts "Debug: $line"
-	}
+        }
 
-	if { [eof stdin] } {
+        if { [string range $line 0 4] == "batch" } {
+            emcee_batch [string range $line 6 end]
+	} elseif { [eof stdin] } {
 	    tclexit
-	}
-	if { $line == "quit" } {
+	} elseif { $line == "quit" } {
 	    tclexit
-	}
-	if { $line == "returnerror" } {
+	} elseif { $line == "returnerror" } {
 	    # this is evil - asked to return an error status because
 	    # the parameters were originally out
 	    puts "$HDR -1 $HDR"
 	    continue
-	}
-
-	eval newpar $line
-	emcee_statistic
+        } else {
+            eval newpar $line
+            emcee_statistic
+        }
     }
-
 }
 
 emcee_startup
