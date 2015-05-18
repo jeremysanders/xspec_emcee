@@ -21,11 +21,13 @@ xspec_helpers = os.path.join(thisdir, 'emcee_helpers.tcl')
 result_re = re.compile(r'@@EMCEE@@\s*(.*?)\s*@@EMCEE@@', flags=re.DOTALL)
 
 class XspecPool(object):
-    def __init__(self, xcm, systems, debug=False, nochdir=False):
+    def __init__(self, xcm, systems, debug=False, nochdir=False,
+                 lognorm=False):
         cmds = [ [start_xspec, system] for system in systems ]
         self.xcm = os.path.abspath(xcm)
         self.debug = debug
         self.nochdir = nochdir
+        self.lognorm = lognorm
 
         # list of open subprocesses
         self.popens = []
@@ -88,6 +90,15 @@ class XspecPool(object):
             link = lines.next().split()
             vals = [float(x) for x in lines.next().split()]
             sigma = float(lines.next())
+            log = name==['norm'] and self.lognorm
+
+            if log:
+                # convert to log
+                for p in 0, 2, 3, 4, 5:
+                    v = vals[p]
+                    if v<=0:
+                        v = 1e-99
+                    vals[p] = N.log10(v)
 
             par = {'index': i+1,
                    'name': name[0],
@@ -100,7 +111,9 @@ class XspecPool(object):
                    'val_softmax': vals[4],
                    'val_hardmax': vals[5],
                    'val_sigma': sigma,
-                   'cmpt': cmpts[i+1]}
+                   'cmpt': cmpts[i+1],
+                   'log': log,
+                   }
             parlist.append(par)
 
         # identify unlinked and unfrozen parameters
@@ -109,15 +122,18 @@ class XspecPool(object):
         self.parameters = []   # full details of parameter
         self.hardmin = []
         self.hardmax = []
+        self.parlog = []
         for par in parlist:
             if not par['linked'] and par['val_delta'] > 0.:
                 self.paridxs.append(par['index'])
                 self.parvals.append(par['val_init'])
                 self.hardmin.append(par['val_hardmin'])
                 self.hardmax.append(par['val_hardmax'])
+                self.parlog.append(par['log'])
                 self.parameters.append(par)
         self.hardmin = N.array(self.hardmin)
         self.hardmax = N.array(self.hardmax)
+        self.parlog = N.array(self.parlog, dtype=N.bool)
         self.maxidx = max(*self.paridxs)
 
     def init_subprocess(self, cmd):
@@ -153,7 +169,10 @@ class XspecPool(object):
         else:
             # set the parameters and await result
             cmd = ["1-%i" % self.maxidx] + [""]*self.maxidx
-            for i, p in itertools.izip(self.paridxs, params):
+            paramscpy = N.array(params)
+            paramscpy[self.parlog] = 10**paramscpy[self.parlog]
+
+            for i, p in itertools.izip(self.paridxs, paramscpy):
                 cmd[i] = str(p)
             return " & ".join(cmd)
 

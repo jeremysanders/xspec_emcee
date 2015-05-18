@@ -40,13 +40,16 @@ def getInitialParameters(parameters, nwalkers):
 def doMCMC(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
            outchain='out.dat', outnpz='out.npz', debug=False,
            continuerun=False, autosave=True,
-           nochdir=False, initialparameters=None):
+           nochdir=False, initialparameters=None,
+           lognorm=False):
     """Do the actual MCMC process."""
 
     # pool controls xspecs and parameters
     # this should be a multiprocessing.Pool, but we implement
     # our own pool as it is much more reliable
-    pool = xspec_pool.XspecPool(xcm, systems, debug=debug, nochdir=nochdir)
+    pool = xspec_pool.XspecPool(
+        xcm, systems, debug=debug, nochdir=nochdir,
+        lognorm=lognorm)
 
     if not initialparameters:
         p0 = getInitialParameters(pool.parameters, nwalkers)
@@ -189,6 +192,8 @@ def main():
                    help="Do not chdir to xcm file directory before execution")
     p.add_argument("--initial-parameters", metavar="FILE",
                    help="Provide initial parameters")
+    p.add_argument("--log-norm", action="store_true", default=False,
+                   help="log norm values during MCMC")
 
     args = p.parse_args()
 
@@ -204,6 +209,7 @@ def main():
                       debug = args.debug,
                       nochdir = args.no_chdir,
                       initialparameters = args.initial_parameters,
+                      lognorm = args.log_norm,
                       )
 
     print "Done"
