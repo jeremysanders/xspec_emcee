@@ -47,9 +47,11 @@ default it runs one copy on a local machine. You can run multiple
 copies by providing a list of systems with the --systems option. The
 name localhost runs on the local system without ssh. For instance
 --systems="localhost localhost" runs two local copies of xspec. You
-can run remote copies over ssh by using a different system name. Note
-that you will probably need to edit start_xspec.sh for non-remote
-systems to run appropriate initialisation files.
+may also use the syntax --systems='localhost*8' to run N copies on a
+system (here localhost).  You can run remote copies over ssh by using
+a different system name. Note that you will probably need to edit
+start_xspec.sh for non-remote systems to run appropriate
+initialisation files.
 
 The program prints out the number of times the xspec model has been
 evaluated as it runs (and the probability value -statistic/2).
@@ -63,25 +65,31 @@ $ ./xspec_emcee.py --help
 usage: xspec_emcee.py [-h] [--niters N] [--nburn N] [--nwalkers N]
                       [--systems LIST] [--output-npz FILE]
                       [--output-chain FILE] [--continue-run] [--debug]
+                      [--no-chdir] [--initial-parameters FILE] [--log-norm]
                       XCM
 
 Xspec MCMC with EMCEE. Jeremy Sanders 2012.
 
 positional arguments:
-  XCM                  Input XCM file
+  XCM                   Input XCM file
 
 optional arguments:
-  -h, --help           show this help message and exit
-  --niters N           Number of iterations (default: 5000)
-  --nburn N            Number of burn iterations (default: 500)
-  --nwalkers N         Number of walkers (default: 50)
-  --systems LIST       Space separated list of systems to run on (default:
-                       localhost)
-  --output-npz FILE    Output NPZ file (default: emcee.npz)
-  --output-chain FILE  Output text file (default: emcee.chain)
-  --continue-run       Continue from an existing chain (in npz) (default:
-                       False)
-  --debug              Create xspec log files (default: False)
+  -h, --help            show this help message and exit
+  --niters N            Number of iterations (default: 5000)
+  --nburn N             Number of burn iterations (default: 500)
+  --nwalkers N          Number of walkers (default: 50)
+  --systems LIST        Space separated list of systems to run on (default:
+                        localhost)
+  --output-npz FILE     Output NPZ file (default: emcee.npz)
+  --output-chain FILE   Output text file (default: emcee.chain)
+  --continue-run        Continue from an existing chain (in npz) (default:
+                        False)
+  --debug               Create xspec log files (default: False)
+  --no-chdir            Do not chdir to xcm file directory before execution
+                        (default: False)
+  --initial-parameters FILE
+                        Provide initial parameters (default: None)
+  --log-norm            log norm values during MCMC (default: False)
 
 TODO:
  - Use local xspec to find remote xspecs automatically?

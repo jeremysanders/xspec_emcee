@@ -10,6 +10,7 @@ Requires Python 2.7+, numpy, scipy and emcee
 import sys
 import argparse
 import time
+import re
 
 import numpy as N
 import emcee
@@ -37,6 +38,17 @@ def getInitialParameters(parameters, nwalkers):
         p0.append( N.array(pwalker) )
     return N.array(p0)
 
+def expandSystems(systems):
+    """Allow system*N syntax in systems."""
+    out = []
+    for s in systems:
+        m = re.match(r'([A-Za-z0-9]+)\*([0-9]+)', s)
+        if m:
+            out += [m.group(1)]*int(m.group(2))
+        else:
+            out.append(s)
+    return out
+
 def doMCMC(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
            outchain='out.dat', outnpz='out.npz', debug=False,
            continuerun=False, autosave=True,
@@ -48,7 +60,7 @@ def doMCMC(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
     # this should be a multiprocessing.Pool, but we implement
     # our own pool as it is much more reliable
     pool = xspec_pool.XspecPool(
-        xcm, systems, debug=debug, nochdir=nochdir,
+        xcm, expandSystems(systems), debug=debug, nochdir=nochdir,
         lognorm=lognorm)
 
     if not initialparameters:
