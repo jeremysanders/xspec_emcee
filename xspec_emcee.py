@@ -145,6 +145,13 @@ def writeXSpecChain(filename, chain, lnprob, params, paridxs):
         width = chain.shape[2]
         f.write('!Length: %i  Width: %i\n' % (length, width+1))
 
+        chain = N.column_stack((N.reshape(chain, (length, width)),
+                                N.reshape(-lnprob*2, (length, 1))))
+        # undo log of some parameters
+        for i, idx in enumerate(paridxs):
+            if params[idx-1]['log']:
+                chain[:,i] = 10**chain[:,i]
+
         # header for contents of file
         hdr = []
         for idx in paridxs:
@@ -152,14 +159,13 @@ def writeXSpecChain(filename, chain, lnprob, params, paridxs):
                     idx, params[idx-1]['name'],
                     "0" if params[idx-1]['unit'] == ""
                     else params[idx-1]['unit']))
+
         hdr.append("Chi-Squared")
         f.write('!%s\n' % ' '.join(hdr))
 
-        for w, walker in enumerate(N.dstack((chain, N.expand_dims(-lnprob*2, 2)))):
-            #f.write('! walker %i\n' % i)
-            for line in walker:
-                fmt = '\t'.join(['%g']*len(line))
-                f.write( fmt % tuple(line) + '\n' )
+        for line in chain:
+            fmt = '\t'.join(['%g']*len(line))
+            f.write( fmt % tuple(line) + '\n' )
 
 def writeNpz(filename, chain, lnprob, maxindex):
     """Write output NPZ file."""
