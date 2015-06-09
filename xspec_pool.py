@@ -22,12 +22,13 @@ result_re = re.compile(r'@@EMCEE@@\s*(.*?)\s*@@EMCEE@@', flags=re.DOTALL)
 
 class XspecPool(object):
     def __init__(self, xcm, systems, debug=False, nochdir=False,
-                 lognorm=False):
+                 lognorm=False, chunksize=4):
         cmds = [ [start_xspec, system] for system in systems ]
         self.xcm = os.path.abspath(xcm)
         self.debug = debug
         self.nochdir = nochdir
         self.lognorm = lognorm
+        self.chunksize = chunksize
 
         # list of open subprocesses
         self.popens = []
@@ -195,7 +196,7 @@ class XspecPool(object):
                 params.append(ptext)
                 numbers.append(i)
 
-        chunksize = 4
+        chunksize = self.chunksize
 
         free = range(len(self.popens))
         waiting = {}

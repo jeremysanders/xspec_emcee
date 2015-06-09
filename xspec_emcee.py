@@ -53,7 +53,7 @@ def doMCMC(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
            outchain='out.dat', outnpz='out.npz', debug=False,
            continuerun=False, autosave=True,
            nochdir=False, initialparameters=None,
-           lognorm=False):
+           lognorm=False, chunksize=4):
     """Do the actual MCMC process."""
 
     # pool controls xspecs and parameters
@@ -61,7 +61,7 @@ def doMCMC(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
     # our own pool as it is much more reliable
     pool = xspec_pool.XspecPool(
         xcm, expandSystems(systems), debug=debug, nochdir=nochdir,
-        lognorm=lognorm)
+        lognorm=lognorm, chunksize=chunksize)
 
     if not initialparameters:
         p0 = getInitialParameters(pool.parameters, nwalkers)
@@ -212,6 +212,8 @@ def main():
                    help="Provide initial parameters")
     p.add_argument("--log-norm", action="store_true", default=False,
                    help="log norm values during MCMC")
+    p.add_argument('--chunk-size', metavar='N', type=int, default=4,
+                   help='Number of sets of parameters to pass to xspec')
 
     args = p.parse_args()
 
@@ -228,6 +230,7 @@ def main():
                       nochdir = args.no_chdir,
                       initialparameters = args.initial_parameters,
                       lognorm = args.log_norm,
+                      chunksize = args.chunk_size,
                       )
 
     print "Done"
