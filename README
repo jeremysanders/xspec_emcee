@@ -83,7 +83,7 @@ optional arguments:
                         localhost)
   --output-hdf5 FILE    Output HDF5 file (default: emcee.hdf5)
   --output-chain FILE   Output text file (default: emcee.chain)
-  --continue-run        Continue from an existing chain (in npz) (default:
+  --continue-run        Continue from an existing chain (in HDF5) (default:
                         False)
   --debug               Create xspec log files (default: False)
   --no-chdir            Do not chdir to xcm file directory before execution
