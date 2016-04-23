@@ -213,19 +213,20 @@ def main():
     args = p.parse_args()
 
     print("Starting MCMC")
-    sampler = doMCMC( args.xcm,
-                      systems = args.systems.split(),
-                      nwalkers = args.nwalkers,
-                      nburn = args.nburn,
-                      niters = args.niters,
-                      outchain = args.output_chain,
-                      outh5 = args.output_h5,
-                      continuerun = args.continue_run,
-                      debug = args.debug,
-                      nochdir = args.no_chdir,
-                      initialparameters = args.initial_parameters,
-                      lognorm = args.log_norm,
-                      )
+    sampler = doMCMC(
+        args.xcm,
+        systems = args.systems.split(),
+        nwalkers = args.nwalkers,
+        nburn = args.nburn,
+        niters = args.niters,
+        outchain = args.output_chain,
+        outh5 = args.output_h5,
+        continuerun = args.continue_run,
+        debug = args.debug,
+        nochdir = args.no_chdir,
+        initialparameters = args.initial_parameters,
+        lognorm = args.log_norm,
+    )
 
     print("Done")
 
