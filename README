@@ -15,14 +15,15 @@ REQUIREMENTS:
 
 Python:   2.x  (2.5 or better)
 argparse: http://pypi.python.org/pypi/argparse (for Python < 2.7)
+h5py:     http://www.h5py.org/
 emcee:    http://danfm.ca/emcee/
 xspec:    http://heasarc.nasa.gov/xanadu/xspec/
 
 USAGE:
 
 The program will run using an input XCM file (loading data+model). It
-writes out an xspec-compatible chain file, plus a numpy npz data file
-containing the chains, probabilities and acceptance fractions.
+writes out an xspec-compatible chain file, plus a HDF5 data file
+containing the chains and log likelihoods.
 
 You need to choose the number of iterations, length of burn in period
 and number of walkers. Remember that for every iteration you get the
@@ -54,21 +55,21 @@ start_xspec.sh for non-remote systems to run appropriate
 initialisation files.
 
 The program prints out the number of times the xspec model has been
-evaluated as it runs (and the probability value -statistic/2).
+evaluated as it runs (and the likelihood value -statistic/2).
 
-The program will save the contents of the chain and probabilities to
-the npz every 10 minutes after the burn-in period. Pressing Ctrl+C
+The program will flush the contents of the chain and likelihoods to
+the HDF5 file every 10 minutes after the burn-in period. Pressing Ctrl+C
 will also save the current state of the chain and exit. The chain can
 be continued with the --continue-run option.
 
 $ ./xspec_emcee.py --help
 usage: xspec_emcee.py [-h] [--niters N] [--nburn N] [--nwalkers N]
-                      [--systems LIST] [--output-npz FILE]
+                      [--systems LIST] [--output-hdf5 FILE]
                       [--output-chain FILE] [--continue-run] [--debug]
                       [--no-chdir] [--initial-parameters FILE] [--log-norm]
                       XCM
 
-Xspec MCMC with EMCEE. Jeremy Sanders 2012.
+Xspec MCMC with EMCEE. Jeremy Sanders 2012-2016.
 
 positional arguments:
   XCM                   Input XCM file
@@ -80,7 +81,7 @@ optional arguments:
   --nwalkers N          Number of walkers (default: 50)
   --systems LIST        Space separated list of systems to run on (default:
                         localhost)
-  --output-npz FILE     Output NPZ file (default: emcee.npz)
+  --output-hdf5 FILE    Output HDF5 file (default: emcee.hdf5)
   --output-chain FILE   Output text file (default: emcee.chain)
   --continue-run        Continue from an existing chain (in npz) (default:
                         False)

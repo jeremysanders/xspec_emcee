@@ -54,7 +54,7 @@ def expandSystems(systems):
     return out
 
 def doMCMC(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
-           outchain='out.dat', outh5='out.h5', debug=False,
+           outchain='out.dat', outhdf5='out.hdf5', debug=False,
            continuerun=False, autosave=True,
            nochdir=False, initialparameters=None,
            lognorm=False):
@@ -91,23 +91,23 @@ def doMCMC(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
 
     if not continuerun:
         # create new datasets, extensible along number of iterations
-        h5file = h5py.File(outh5, "w")
-        chain = h5file.create_dataset(
+        hdf5file = h5py.File(outhdf5, "w")
+        chain = hdf5file.create_dataset(
             "chain",
             (nwalkers, niters, ndims),
             maxshape=(nwalkers, None, ndims))
-        lnprob = h5file.create_dataset(
+        lnprob = hdf5file.create_dataset(
             "lnprob",
             (nwalkers, niters),
             maxshape=(nwalkers, None))
         start = 0
 
     else:
-        print("Continuing from existing chain in", outh5)
+        print("Continuing from existing chain in", outhdf5)
 
-        h5file = h5py.File(outh5, "r+")
-        chain = h5file["chain"]
-        lnprob = h5file["lnprob"]
+        hdf5file = h5py.File(outhdf5, "r+")
+        chain = hdf5file["chain"]
+        lnprob = hdf5file["lnprob"]
 
         start = chain.attrs["count"]
         pos = N.array(chain[:, start-1, :])
@@ -130,7 +130,7 @@ def doMCMC(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
 
             if autosave and time.time() - lastsave > 60*10:
                 chain.attrs["count"] = index
-                h5file.flush()
+                hdf5file.flush()
 
     except KeyboardInterrupt:
         chain.attrs["count"] = index
@@ -142,7 +142,7 @@ def doMCMC(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
         with open(outchain, "w") as chainf:
             writeXSpecChain(chainf, chain, lnprob, pool.parlist, pool.paridxs)
 
-    h5file.close()
+    hdf5file.close()
 
 def writeXSpecChain(chainf, chain, lnprob, params, paridxs):
     """Write an xspec text chain file to file object chainf."""
@@ -195,12 +195,12 @@ def main():
                    help="Number of walkers")
     p.add_argument("--systems", default="localhost", metavar="LIST",
                    help="Space separated list of systems to run on")
-    p.add_argument("--output-h5", default="emcee.h5", metavar="FILE",
+    p.add_argument("--output-hdf5", default="emcee.hdf5", metavar="FILE",
                    help="Output HDF5 file")
     p.add_argument("--output-chain", default="emcee.chain", metavar="FILE",
                    help="Output text file")
     p.add_argument("--continue-run",  action="store_true", default=False,
-                   help="Continue from an existing chain (in npz)")
+                   help="Continue from an existing chain (in HDF5)")
     p.add_argument("--debug", action="store_true", default=False,
                    help="Create xspec log files")
     p.add_argument("--no-chdir", action="store_true", default=False,
@@ -220,7 +220,7 @@ def main():
         nburn = args.nburn,
         niters = args.niters,
         outchain = args.output_chain,
-        outh5 = args.output_h5,
+        outhdf5 = args.output_hdf5,
         continuerun = args.continue_run,
         debug = args.debug,
         nochdir = args.no_chdir,
