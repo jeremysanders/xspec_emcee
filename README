@@ -4,6 +4,11 @@ XSPEC_EMCEE
 This is a program to use emcee to do MCMC analyses of X-ray spectra in
 xspec.
 
+This program has the advantage over the built-in Goodman Weare sampler
+in xspec of being able to run multiple xspec processes simultaneously,
+speeding up the analysis. It can also switch to parameterizing norm
+parameters in log space.
+
 ** Please acknowledge use of this code by Jeremy Sanders in any
 publications. **
 
