@@ -152,6 +152,11 @@ def writeXSpecChain(chainf, chain, lnprob, params, paridxs):
 
     nwalkers, niters, ndims = chain.shape
 
+    # real length could be shorter
+    niters = chain.attrs["count"]
+
+    chainf.write('!Length: %i  Width: %i\n' % (niters*nwalkers, ndims+1))
+
     # header for contents of file
     hdr = []
     for idx in paridxs:
