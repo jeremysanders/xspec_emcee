@@ -7,7 +7,7 @@ Jeremy Sanders 2012-2017
 Requires Python 2.7+, numpy, h5py and emcee
 """
 
-from __future__ import print_function, division
+from __future__ import print_function, division, absolute_import
 
 import sys
 import argparse
@@ -19,8 +19,8 @@ import h5py
 import numpy as N
 import emcee
 
-from xspec_model import XspecModel
-from xspec_pool import XspecPool
+from .xspec_model import XspecModel
+from .xspec_pool import XspecPool
 
 def get_initial_parameters(parameters, nwalkers):
     """Construct list of initial parameter values for each walker."""
@@ -189,7 +189,7 @@ def write_xspec_chain(chainf, chain, lnprob, params, paridxs, nwalkers):
             line = fmt % tuple(pars) + '\t' + '%g' % stat + '\n'
             chainf.write(line)
 
-def main():
+def run():
     """Main program."""
 
     p = argparse.ArgumentParser(
@@ -244,4 +244,4 @@ def main():
     print("Done")
 
 if __name__ == '__main__':
-    main()
+    run()

@@ -1,9 +1,9 @@
-from __future__ import print_function, division
+from __future__ import print_function, division, absolute_import
 
 import re
 import numpy as N
 
-from xspec_proc import XspecProc
+from .xspec_proc import XspecProc
 
 class Par:
     """Model parameter convenience class."""
