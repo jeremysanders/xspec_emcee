@@ -2,9 +2,9 @@
 
 """
 Use EMCEE to do MCMC in Xspec.
-Jeremy Sanders 2012-2016
+Jeremy Sanders 2012-2017
 
-Requires Python 2.7+, numpy, scipy, h5py and emcee
+Requires Python 2.7+, numpy, h5py and emcee
 """
 
 from __future__ import print_function, division
@@ -19,7 +19,8 @@ import h5py
 import numpy as N
 import emcee
 
-import xspec_pool
+from xspec_model import XspecModel
+from xspec_pool import XspecPool
 
 def get_initial_parameters(parameters, nwalkers):
     """Construct list of initial parameter values for each walker."""
@@ -61,22 +62,22 @@ def do_mcmc(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
     """Do the actual MCMC process."""
 
     print("Loading XCM file")
-    xspec = xspec_pool.Xspec(
+    xmodel = XspecModel(
         xcm, expand_systems(systems), debug=debug, nochdir=nochdir)
 
     if lognorm:
         print("Using prior equivalent to log parameter")
-        xspec.log_norms_priors()
+        xmodel.log_norms_priors()
 
     if not initialparameters:
         print("Getting initial parameters")
-        p0 = get_initial_parameters(xspec.thawedpars, nwalkers)
+        p0 = get_initial_parameters(xmodel.thawedpars, nwalkers)
     else:
         print("Loading initial parameters from", initialparameters)
         p0 = N.loadtxt(initialparameters)
 
     ndims = p0.shape[1]
-    pool = xspec_pool.XspecPool(xspec)
+    pool = XspecPool(xmodel)
 
     # sample the mcmc
     sampler = emcee.EnsembleSampler(nwalkers, ndims, None, pool=pool)
@@ -146,7 +147,7 @@ def do_mcmc(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
         with open(outchain, "w") as chainf:
             write_xspec_chain(
                 chainf, chain, lnprob,
-                xspec.thawedpars, xspec.xspec_thawed_idxs(),
+                xmodel.thawedpars, xmodel.xspec_thawed_idxs(),
                 nwalkers)
 
     hdf5file.close()
@@ -192,7 +193,7 @@ def main():
     """Main program."""
 
     p = argparse.ArgumentParser(
-        description="Xspec MCMC with EMCEE. Jeremy Sanders 2012-2016.",
+        description="Xspec MCMC with EMCEE. Jeremy Sanders 2012-2017.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     p.add_argument("xcm", metavar="XCM",
@@ -204,7 +205,7 @@ def main():
     p.add_argument("--nwalkers", metavar="N", type=int, default=50,
                    help="Number of walkers")
     p.add_argument("--systems", default="localhost", metavar="LIST",
-                   help="Space separated list of systems to run on")
+                   help="Space-separated list of computers to run on")
     p.add_argument("--output-hdf5", default="emcee.hdf5", metavar="FILE",
                    help="Output HDF5 file")
     p.add_argument("--output-chain", default="emcee.chain", metavar="FILE",
@@ -212,15 +213,15 @@ def main():
     p.add_argument("--continue-run",  action="store_true", default=False,
                    help="Continue from an existing chain (in HDF5)")
     p.add_argument("--debug", action="store_true", default=False,
-                   help="Create xspec log files")
+                   help="Create Xspec log files")
     p.add_argument("--no-chdir", action="store_true", default=False,
-                   help="Do not chdir to xcm file directory before execution")
+                   help="Do not chdir to XCM file directory before execution")
     p.add_argument("--initial-parameters", metavar="FILE",
                    help="Provide initial parameters")
     p.add_argument("--log-norm", action="store_true", default=False,
-                   help="log norm values during MCMC")
+                   help="Use priors equivalent to using log norms")
     p.add_argument('--chunk-size', metavar='N', type=int, default=4,
-                   help='Number of sets of parameters to pass to xspec')
+                   help='Currently ignored')
 
     args = p.parse_args()
 
