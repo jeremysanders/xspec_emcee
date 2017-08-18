@@ -1,0 +1,4 @@
+#!/usr/bin/env python
+
+import xspec_emcee
+xspec_emcee.run()
