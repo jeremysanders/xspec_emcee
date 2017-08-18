@@ -1,75 +1,50 @@
 # helper functions for emcee_xspec
-# Jeremy Sanders 2012
 
-set HDR "@@EMCEE@@"
+set HSTART ">EMCEE>"
+set HEND "<EMCEE<"
 set EMCEE_DEBUG 0
 
 # startup
 proc emcee_startup {} {
+    global EMCEE_DEBUG
     puts "Running emcee startup script"
     autosave off
-    chatter 1
+    if { ! $EMCEE_DEBUG } {
+        chatter 1
+    }
+    query no
 }
 
-# get list of components and parameters
-proc emcee_interrogate_params {} {
-    global HDR
-    puts $HDR
-
-    query no
-    fit 100
-
-    # return component information
-    #  number of components * number of datagroups
-    puts [ expr [tcloutr modcomp]*[tcloutr datagrp] ]
-
-    #  loop over data groups
-    for {set dg 1} {$dg <= [tcloutr datagrp]} {incr dg} {
-	#  loop over components
-	for {set c 1} {$c <= [tcloutr modcomp]} {incr c} {
-	   puts [tcloutr compinfo $c $dg]
-	}
-    }
-
-    # return parameter information
-    puts [tcloutr modpar]
-    for {set i 1} {$i <= [tcloutr modpar]} {incr i} {
-	puts [tcloutr pinfo $i]
-	puts [tcloutr plink $i]
-	if { [llength [tcloutr param $i]] > 1 } {
-	    puts [tcloutr param $i]
-	    puts [tcloutr sigma $i]
-	} else {
-	    # switch parameters only return a single value and return
-	    # an error for tcloutr sigma, so work around this
-	    puts "[tcloutr param $i] -1 -1e30 -1e30 1e30 1e30"
-	    puts "-1"
-	}
-    }
-    puts $HDR
+proc emcee_tcloutr { args } {
+    global HSTART HEND
+    set res [eval tcloutr $args]
+    puts "$HSTART$res$HEND"
 }
 
 # get statistic
 proc emcee_statistic { } {
-    global HDR
-    puts "$HDR [tcloutr stat] $HDR"
+    global HSTART HEND
+    puts "$HSTART[tcloutr stat]$END"
 }
 
 proc emcee_batch { pars } {
-    global HDR
+    global HSTART HEND
+
     set stats ""
-    foreach p $pars {
-        eval newpar $p
+    foreach ps $pars {
+        foreach subp $ps {
+            eval newpar $subp
+        }
         lappend stats [tcloutr stat]
     }
-    puts "$HDR $stats $HDR"
+
+    puts "$HSTART$stats$END"
 }
 
 # loop taking parameters and returning results
 # exits when quit is entered or stdin closes
 proc emcee_loop { } {
-    global EMCEE_DEBUG
-    global HDR
+    global EMCEE_DEBUG HSTART HEND
 
     fconfigure stdin -buffering line
     fconfigure stdout -buffering line
@@ -90,13 +65,10 @@ proc emcee_loop { } {
 	} elseif { $line == "returnerror" } {
 	    # this is evil - asked to return an error status because
 	    # the parameters were originally out
-	    puts "$HDR -1 $HDR"
+	    puts "$HSTART -1 $HEND"
 	    continue
         } else {
-            eval newpar $line
-            emcee_statistic
+            eval $line
         }
     }
 }
-
-emcee_startup

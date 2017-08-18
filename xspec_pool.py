@@ -8,236 +8,384 @@ import time
 import atexit
 import subprocess
 import select
+from collections import defaultdict
 
 import numpy as N
 
 # script to start xspec
 thisdir = os.path.dirname( os.path.abspath(__file__) )
 start_xspec = os.path.join(thisdir, 'start_xspec.sh')
-# helper routines to load
+# helper routines to load in xspec
 xspec_helpers = os.path.join(thisdir, 'emcee_helpers.tcl') 
 
 # get result (stripped of whitespace)
-result_re = re.compile(r'@@EMCEE@@\s*(.*?)\s*@@EMCEE@@', flags=re.DOTALL)
+result_re = re.compile(r'>EMCEE>\s*(.*?)\s*<EMCEE<', flags=re.DOTALL)
 
-class XspecPool(object):
-    def __init__(self, xcm, systems, debug=False, nochdir=False,
-                 lognorm=False, chunksize=4):
-        cmds = [ [start_xspec, system] for system in systems ]
-        self.xcm = os.path.abspath(xcm)
-        self.debug = debug
-        self.nochdir = nochdir
-        self.lognorm = lognorm
-        self.chunksize = chunksize
+# keep track of running xspec processes to make sure they are ended
+running_procs = set()
+@atexit.register
+def _finish_running_procs():
+    """End any xspec processes in event of crash."""
+    for p in running_procs:
+        p.send_finish()
+    for p in list(running_procs):
+        p.wait_finish()
 
-        # list of open subprocesses
-        self.popens = []
-        self.buffers = {}
-        for cmd in [ [start_xspec, system] for system in systems ]:
-            self.popens.append(self.init_subprocess(cmd))
-            self.buffers[self.popens[-1]] = ''
-        atexit.register(self.finish)
+class Par:
+    """Model parameter convenience class."""
 
-        # get parameters for xcm model
-        self.get_params()
+    def __init__(self, **argsv):
+        self.__dict__.update(argsv)
 
-        # enter execution loop
-        for popen in self.popens:
-            popen.stdin.write('emcee_loop\n')
+        if 'prior' not in argsv:
+            self.prior = self._flatPrior
 
-        # feedback
-        self.count = 0
+    def __repr__(self):
+        out = []
+        for k, v in sorted(self.__dict__.items()):
+            out.append('%s=%s' % (k, repr(v)))
+        return '<Par(%s)>' % ', '.join(out)
 
-    def finish(self):
-        """Finish all processes."""
-        # tell processes to finish
-        for p in self.popens:
-            p.stdin.write('quit\n')
-            p.stdin.close()
-        # wait until they have closed
-        for p in self.popens:
-            p.wait()
-        del self.popens[:]
+    def _flatPrior(self, val):
+        """Calculate prior log likelihood for parameter."""
+        if val < self.minval or val > self.maxval:
+            return -N.inf
+        return 0.
 
-    def get_params(self):
-        """Get list of parameters from first process."""
-        p = self.popens[0]
+class XspecProc:
+    """Handle Xspec process."""
 
-        # send command to get parameters
-        p.stdin.write('emcee_interrogate_params\n')
-        txt = ''
-        while True:
-            txt += os.read(p.stdout.fileno(), 4096)
-            match = result_re.search(txt)
-            if match:
-                break
-        lines = iter( match.group(1).split('\n') )
+    def __init__(self, xcm, system, debug=False, nochdir=False):
+        self.popen = self._init_subprocess(xcm, system, debug, nochdir)
+        self.buffer = ''
+        running_procs.add(self)
 
-        # build up mapping from parameter index -> component name
-        cmpts = {}
-        ncmpt = int(lines.next())
-        for i in xrange(ncmpt):
-            cmpinfo = lines.next().split()
-            name = "%s[%i]" % (cmpinfo[0], i+1)
-            start, count = int(cmpinfo[1]), int(cmpinfo[2])
-            for c in xrange(start, start+count):
-                cmpts[c] = name
+    def fileno(self):
+        """Get fileno to wait for output."""
+        return self.popen.stdout.fileno()
 
-        # now build up a list of parameter dicts
-        self.parlist = parlist = []
-        nvars = int(lines.next())
-        for i in xrange(nvars):
-            name = lines.next().split()
-            link = lines.next().split()
-            vals = [float(x) for x in lines.next().split()]
-            sigma = float(lines.next())
-            log = name==['norm'] and self.lognorm
-
-            if log:
-                # convert to log
-                for p in 0, 2, 3, 4, 5:
-                    v = vals[p]
-                    if v<=0:
-                        v = 1e-99
-                    vals[p] = N.log10(v)
-
-            par = {'index': i+1,
-                   'name': name[0],
-                   'unit': '' if len(name) == 1 else name[1],
-                   'linked': link[0].lower() == 't',
-                   'val_init': vals[0],
-                   'val_delta': vals[1],
-                   'val_hardmin': vals[2],
-                   'val_softmin': vals[3],
-                   'val_softmax': vals[4],
-                   'val_hardmax': vals[5],
-                   'val_sigma': sigma,
-                   'cmpt': cmpts[i+1],
-                   'log': log,
-                   }
-            parlist.append(par)
-
-        # identify unlinked and unfrozen parameters
-        self.paridxs = []   # indices
-        self.parvals = []   # values
-        self.parameters = []   # full details of parameter
-        self.hardmin = []
-        self.hardmax = []
-        self.parlog = []
-        for par in parlist:
-            if not par['linked'] and par['val_delta'] > 0.:
-                self.paridxs.append(par['index'])
-                self.parvals.append(par['val_init'])
-                self.hardmin.append(par['val_hardmin'])
-                self.hardmax.append(par['val_hardmax'])
-                self.parlog.append(par['log'])
-                self.parameters.append(par)
-        self.hardmin = N.array(self.hardmin)
-        self.hardmax = N.array(self.hardmax)
-        self.parlog = N.array(self.parlog, dtype=N.bool)
-        self.maxidx = max(*self.paridxs)
-
-    def init_subprocess(self, cmd):
+    def _init_subprocess(self, xcm, system, debug, nochdir):
         """Initialise the xspec process given."""
 
+        cmd = [start_xspec, system]
         popen = subprocess.Popen(
             cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
         # load helper routines
         popen.stdin.write('source %s\n' % xspec_helpers)
 
-        if self.debug:
-            popen.stdin.write('set logfile '
-                              '$env(HOME)/xspec.log.[info hostname].[pid]\n')
+        if debug:
+            popen.stdin.write(
+                'set logfile '
+                '$env(HOME)/xspec.log.[info hostname].[pid]\n')
             popen.stdin.write('file delete $logfile\n')
             popen.stdin.write('log $logfile\n')
             popen.stdin.write('set EMCEE_DEBUG 1\n')
 
         # load xcm in current directory
-        if self.nochdir:
-            popen.stdin.write('@%s\n' % self.xcm)
+        absxcm = os.path.abspath(xcm)
+        if nochdir:
+            popen.stdin.write('@%s\n' % absxcm)
         else:
-            popen.stdin.write('cd %s\n' % os.path.dirname(self.xcm))
-            popen.stdin.write('@%s\n' % os.path.basename(self.xcm))
+            popen.stdin.write('cd %s\n' % os.path.dirname(absxcm))
+            popen.stdin.write('@%s\n' % os.path.basename(absxcm))
 
-        time.sleep(0.5)
+        popen.stdin.write('emcee_startup\n')
+        if not debug:
+            popen.stdin.write('emcee_loop\n')
         return popen
 
-    def get_parameters(self, params):
-        """Send parameters to process."""
-        if N.any(params < self.hardmin) or N.any(params > self.hardmax):
-            return None
+    def send_cmd(self, cmd):
+        """Send a command."""
+        self.popen.stdin.write(cmd + '\n')
+        self.popen.stdin.flush()
+
+    def read_buffer(self):
+        """Read from process into buffer.
+
+        If there is a result in the buffer, then return string value
+        """
+        self.buffer += os.read(self.popen.stdout.fileno(), 8192)
+        match = result_re.search(self.buffer)
+        if match:
+            result = match.group(1)
+            self.buffer = ''  # assume only one result in read!
+            return result
         else:
-            # set the parameters and await result
-            cmd = ["1-%i" % self.maxidx] + [""]*self.maxidx
-            paramscpy = N.array(params)
-            paramscpy[self.parlog] = 10**paramscpy[self.parlog]
+            return None
 
-            for i, p in itertools.izip(self.paridxs, paramscpy):
-                cmd[i] = str(p)
-            return " & ".join(cmd)
+    def single_cmd(self, cmd):
+        """Send command and return result."""
+        self.send_cmd(cmd)
+        while True:
+            result = self.read_buffer()
+            if result is not None:
+                break
+        return result
 
-    def map(self, function, paramlist):
+    def tclout(self, args):
+        """Shortcut to get tclout results."""
+        return self.single_cmd('emcee_tcloutr ' + args)
+
+    def send_finish(self):
+        """Tell subprocess to finish."""
+        self.send_cmd('quit')
+        self.popen.stdin.close()
+
+    def wait_finish(self):
+        """Wait for subprocess to finish."""
+        self.popen.wait()
+        self.popen = None
+        running_procs.remove(self)
+
+class Xspec:
+    """Handle the multiple processes in xspec."""
+
+    def __init__(self, xcm, systems, debug=False, nochdir=False):
+
+        self.procs = [
+            XspecProc(xcm, system, debug=debug, nochdir=nochdir)
+            for system in systems
+            ]
+        self.models, self.pars = self._get_pars()
+
+        # filter thawed parameters
+        self.thawedpars = []
+        # thawed parameter indices in xspec format
+        for modelname in self.models:
+            thawed = [p for p in self.pars[modelname] if p.thawed]
+            self.thawedpars += thawed
+
+    def xspecThawedIndexes(self):
+        """Return list of thawed parameter indices in xspec format."""
+        return [
+            ('' if p.model=='unnamed' else p.model+':')+str(p.index)
+            for p in self.thawedpars
+            ]
+
+    def finish(self):
+        """Finish all processes."""
+        for proc in self.procs:
+            self.send_finish()
+        for proc in self.procs:
+            self.wait_finish()
+        del self.procs[:]
+
+    def logPriorsNorms(self, minnorm=1e-10):
+        """Modify priors on norms to be flat in log space."""
+
+        def getPrior(par):
+            def prior(v):
+                if v < par.minval or v > par.maxval:
+                    return -N.inf
+                return -N.log(v)
+            return prior
+
+        for par in self.thawedpars:
+            if par.name == 'norm':
+                print(' Using prior for log value on parameter %s:%s:%i' % (
+                        par.model, par.cmpt, par.index))
+
+                par.minval = max(par.minval, minnorm)
+                par.prior = getPrior(par)
+
+    def _get_pars(self):
+        """Get parameters from xcm file
+
+        Returns a list of models and a dict mapping model names to a
+        list of Par objects. 'unnamed' is the main xspec model.
+        """
+
+        # initial fit required to get sigma values
+        self.procs[0].send_cmd('fit')
+
+        xmodel = self.procs[0].tclout('model')
+        models = ['unnamed'] + re.findall('([A-Za-z0-9]+):', xmodel)
+
+        # get model component information
+        model_pars = {}
+        for model in models:
+            model_pars[model] = self._get_model_pars(model)
+
+        return models, model_pars
+
+    def _get_model_pars(self, model):
+        """Get parameters for model given.
+
+        xspec supports multiple models
+        model is unnamed or model name
+        """
+
+        p0 = self.procs[0]
+        bmodel = '' if model=='unnamed' else model
+        ncmpt = int(p0.tclout('modcomp %s' % bmodel))
+        ndgrp = int(p0.tclout('datagrp'))
+
+        cmptmodelidx = 1
+        pars = []
+        # iterate over data groups
+        for dgrp in range(ndgrp):
+            # iterate over components in data group
+            for cmpt in range(ncmpt):
+                pars += self._get_cmpt_pars(model, dgrp, cmpt, cmptmodelidx)
+                cmptmodelidx += 1
+        return pars
+
+    def _get_cmpt_pars(self, model, dgrp, cmpt, cmptmodelidx):
+        """Get parameters associated with model, datagroup and component.
+
+        cmptmodelidx is a numerical index which goes into the component
+        name, counting inside the model."""
+
+        p0 = self.procs[0]
+        cmodel = '' if model=='unnamed' else model+':'
+        cmptinfo = p0.tclout(
+            'compinfo %s%i %i' % (cmodel, cmpt+1, dgrp+1)).split()
+        startpar, npars = int(cmptinfo[1]), int(cmptinfo[2])
+        cmptname = '%s<%i>' % (cmptinfo[0], cmptmodelidx)
+
+        pars = []
+        # iterate over parameters in component
+        for paridx in range(startpar, startpar+npars):
+            # name and unit
+            parinfo = p0.tclout('pinfo %s%i' % (cmodel, paridx)).split()
+
+            # is model linked?
+            linked = p0.tclout('plink %s%i' % (cmodel, paridx))[:1] == 'T'
+
+            # parameter value, range, etc
+            pvals = [
+                float(x) for x in
+                p0.tclout('param %s%i' % (cmodel, paridx)).split() ]
+
+            if len(pvals) == 1:
+                # switch parameter
+                minval = maxval = delta = None
+                thawed = False
+            else:
+                thawed = pvals[1] > 0 and not linked
+                minval, maxval, delta = pvals[2], pvals[5], pvals[1]
+
+            if thawed:
+                sigma = float(p0.tclout('sigma %s%i' % (cmodel, paridx)))
+            else:
+                sigma = 0.
+
+            par = Par(
+                name=parinfo[0],
+                unit='' if len(parinfo)==1 else parinfo[1],
+                cmpt=cmptname,
+                model=model,
+                index=paridx,
+                initval=pvals[0],
+                minval=minval,
+                maxval=maxval,
+                linked=linked,
+                thawed=thawed,
+                delta=delta,
+                sigma=sigma,
+                )
+            pars.append(par)
+        return pars
+
+class XspecPool(object):
+    def __init__(self, xspec):
+        """Initialise pool.
+
+        xspec is a Xspec object.
+        """
+
+        self.xspec = xspec
+
+        # keep track of evaluations
+        self.itercount = 0
+
+    def map(self, dummyfunc, paramlist):
         """Return a list of lnprob values for the list parameter sets
         given.
 
-        Note: function is never called!
+        Note: dummyfunc is never called!
         """
 
-        # convert parameters to text
-        retn = N.zeros(len(paramlist), dtype=N.float64)*N.nan
-        numbers = []
-        params = []
-        for i, p in enumerate(paramlist):
-            ptext = self.get_parameters(p)
-            if ptext is None:
-                retn[i] = -1
+        fileno_to_proc = {x.fileno(): x for x in self.xspec.procs}
+
+        # file numbers of processes doing nothing
+        free = list(fileno_to_proc.keys())
+        # map file numbers of processes working on data to output index
+        processing = {}
+
+        # indices of parameters to be processed
+        toprocess = range(len(paramlist))
+
+        # output likelihoods
+        likeout = N.zeros(len(paramlist), dtype=N.float64)
+
+        def check():
+            for fileno in select.select(list(processing.keys()), [], [])[0]:
+                proc = fileno_to_proc[fileno]
+                result = proc.read_buffer()
+                if result is not None:
+                    like = -0.5*float(result)
+                    # add likelihood to prior
+                    likeout[processing[fileno]] += like
+                    # free up process for next job
+                    free.append(fileno)
+                    del processing[fileno]
+
+        while toprocess:
+            if free:
+                paridx = toprocess.pop()
+                parset = paramlist[paridx]
+
+                # calculate prior for set of parameters
+                # skip doing evaluation if prior is not finite
+                prior = 0.
+                for par, val in itertools.izip(self.xspec.thawedpars, parset):
+                    prior += par.prior(val)
+                if not N.isfinite(prior):
+                    likeout[paridx] = -N.inf
+                    continue
+                likeout[paridx] = prior
+
+                # build up newpar command to send to xspec
+                modpars = defaultdict(list)
+                for par, val in itertools.izip(self.xspec.thawedpars, parset):
+                    mpm = modpars[par.model]
+                    while len(mpm) < par.index-1:
+                        mpm.append('')
+                    mpm.append('%e' % val)
+                # newpar command for each model
+                cmds = []
+                for model, pars in modpars.iteritems():
+                    cmd = 'newpar %s1-%i & %s' % (
+                        '' if model == 'unnamed' else model+':',
+                        len(pars), ' & '.join(pars))
+                    cmds.append(cmd)
+                # command to get output statistic
+                cmds.append('emcee_tcloutr stat')
+
+                fileno = free.pop()
+                proc = fileno_to_proc[fileno]
+                proc.send_cmd('\n'.join(cmds))
+                processing[fileno] = paridx
+
             else:
-                params.append(ptext)
-                numbers.append(i)
+                # check for a completed process
+                check()
 
-        chunksize = self.chunksize
+        # wait for final completion
+        while processing:
+            check()
 
-        free = range(len(self.popens))
-        waiting = {}
-
-        while len(params) > 0 or len(waiting) > 0:
-            # send off parameters to any waiting processes
-            while free and len(params)>0:
-                idx = free.pop()
-                popen = self.popens[idx]
-                chunk = params[:chunksize]
-                chunkparams = ' '.join('{%s}' % p for p in chunk)
-                popen.stdin.write('batch %s\n' % chunkparams)
-                waiting[popen.stdout.fileno()] = (idx, popen, numbers[:chunksize])
-                params = params[chunksize:]
-                numbers = numbers[chunksize:]
-
-            # have any finished processing?
-            stdouts = select.select(waiting.keys(), [], [])[0]
-            for stdout in stdouts:
-                idx, popen, pnumbers = waiting[stdout]
-                self.buffers[popen] += os.read(stdout, 4096)
-                match = result_re.search(self.buffers[popen])
-                if match:
-                    results = match.group(1)
-                    results = N.fromstring(results, dtype=N.float64, sep=' ')
-                    retn[pnumbers] = results
-                    self.buffers[popen] = ''
-                    free.append(idx)
-                    del waiting[stdout]
-
-        assert N.all(N.isfinite(retn))
-
-        resfilt = retn[retn > 0]
-        if len(resfilt) > 0 and self.count % 2 == 0:
-            print('%5i   mean=<%9.1f> min=<%9.1f> bad=<%4i/%4i>' % (
-                    self.count // 2, resfilt.mean(), resfilt.min(),
-                    N.sum((retn<0).astype(N.intc)), len(retn),
+        resfilt = likeout[N.isfinite(likeout)]
+        if len(resfilt) > 0 and self.itercount % 2 == 0:
+            print('%5i   mean=<%9.1f> max=<%9.1f> std=<%9.1f> good=<%4i/%4i>' % (
+                    self.itercount // 2,
+                    resfilt.mean(),
+                    resfilt.max(),
+                    resfilt.std(),
+                    len(resfilt), len(likeout),
                     ))
-        self.count += 1
+        self.itercount += 1
 
-        lnprob = retn*-0.5
-        lnprob[lnprob>0] = -N.inf
-
-        return lnprob
+        return likeout

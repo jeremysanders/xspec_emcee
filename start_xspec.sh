@@ -7,7 +7,10 @@
 
 host=$1
 if [ $host == localhost ]; then
+    # avoid using ssh if running ssh on local machine
     exec xspec
 else
-    exec ssh -c arcfour -x $host "source /etc/profile; do_xray_profile; exec xspec"
+    # modify this command to start remote process
+    # here ~/.bash_profile is the script which initialises heasoft
+    exec ssh -x $host "source ${HOME}/.bash_profile; exec xspec"
 fi
