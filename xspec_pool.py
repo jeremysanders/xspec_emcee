@@ -156,7 +156,7 @@ class Xspec:
             thawed = [p for p in self.pars[modelname] if p.thawed]
             self.thawedpars += thawed
 
-    def xspecThawedIndexes(self):
+    def xspec_thawed_idxs(self):
         """Return list of thawed parameter indices in xspec format."""
         return [
             ('' if p.model=='unnamed' else p.model+':')+str(p.index)
@@ -171,7 +171,7 @@ class Xspec:
             self.wait_finish()
         del self.procs[:]
 
-    def logPriorsNorms(self, minnorm=1e-10):
+    def log_norms_priors(self, minnorm=1e-10):
         """Modify priors on norms to be flat in log space."""
 
         def getPrior(par):

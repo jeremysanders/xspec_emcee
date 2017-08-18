@@ -21,7 +21,7 @@ import emcee
 
 import xspec_pool
 
-def getInitialParameters(parameters, nwalkers):
+def get_initial_parameters(parameters, nwalkers):
     """Construct list of initial parameter values for each walker."""
     p0 = []
     for walker in xrange(nwalkers):
@@ -42,7 +42,7 @@ def getInitialParameters(parameters, nwalkers):
         p0.append( N.array(pwalker) )
     return N.array(p0)
 
-def expandSystems(systems):
+def expand_systems(systems):
     """Allow system*N syntax in systems."""
     out = []
     for s in systems:
@@ -53,24 +53,24 @@ def expandSystems(systems):
             out.append(s)
     return out
 
-def doMCMC(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
-           outchain='out.dat', outhdf5='out.hdf5', debug=False,
-           continuerun=False, autosave=True,
-           nochdir=False, initialparameters=None,
-           lognorm=False, chunksize=4):
+def do_mcmc(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
+            outchain='out.dat', outhdf5='out.hdf5', debug=False,
+            continuerun=False, autosave=True,
+            nochdir=False, initialparameters=None,
+            lognorm=False, chunksize=4):
     """Do the actual MCMC process."""
 
     print("Loading XCM file")
     xspec = xspec_pool.Xspec(
-        xcm, expandSystems(systems), debug=debug, nochdir=nochdir)
+        xcm, expand_systems(systems), debug=debug, nochdir=nochdir)
 
     if lognorm:
-        print("Using Jeffreys prior equivalent to log parameter")
-        xspec.logPriorsNorms()
+        print("Using prior equivalent to log parameter")
+        xspec.log_norms_priors()
 
     if not initialparameters:
         print("Getting initial parameters")
-        p0 = getInitialParameters(xspec.thawedpars, nwalkers)
+        p0 = get_initial_parameters(xspec.thawedpars, nwalkers)
     else:
         print("Loading initial parameters from", initialparameters)
         p0 = N.loadtxt(initialparameters)
@@ -144,14 +144,14 @@ def doMCMC(xcm, nwalkers=100, nburn=100, niters=1000, systems = ['localhost'],
         chain.attrs["count"] = index
         print("Writing chain", outchain)
         with open(outchain, "w") as chainf:
-            writeXSpecChain(
+            write_xspec_chain(
                 chainf, chain, lnprob,
-                xspec.thawedpars, xspec.xspecThawedIndexes(),
+                xspec.thawedpars, xspec.xspec_thawed_idxs(),
                 nwalkers)
 
     hdf5file.close()
 
-def writeXSpecChain(chainf, chain, lnprob, params, paridxs, nwalkers):
+def write_xspec_chain(chainf, chain, lnprob, params, paridxs, nwalkers):
     """Write an xspec text chain file to file object chainf.
     """
 
@@ -173,7 +173,6 @@ def writeXSpecChain(chainf, chain, lnprob, params, paridxs, nwalkers):
         hdr.append("%s %s %s" % (
                 idx, par.name,
                 par.unit if par.unit else "0"))
-    #hdr.append("Chi-Squared")
     hdr.append("Likelihood")
     chainf.write('!%s\n' % ' '.join(hdr))
 
@@ -182,7 +181,6 @@ def writeXSpecChain(chainf, chain, lnprob, params, paridxs, nwalkers):
     # then each walker separately
     for wi in xrange(nwalkers):
         chainw = chain[wi, :, :]
-        #statw = -2 * lnprob[wi, :]
         statw = lnprob[wi, :]
 
         # write output
@@ -226,7 +224,7 @@ def main():
 
     args = p.parse_args()
 
-    sampler = doMCMC(
+    sampler = do_mcmc(
         args.xcm,
         systems = args.systems.split(),
         nwalkers = args.nwalkers,
