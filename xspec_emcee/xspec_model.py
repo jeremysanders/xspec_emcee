@@ -29,8 +29,9 @@ class Par:
 class XspecModel:
     """Handle multiple Xspec processes and model."""
 
-    def __init__(self, xcm, systems, debug=False, nochdir=False):
+    def __init__(self, xcm, systems, debug=False, nochdir=False, xspecindex=-1):
 
+        self.xspecindex = xspecindex
         self.procs = [
             XspecProc(xcm, system, debug=debug, nochdir=nochdir)
             for system in systems
@@ -38,17 +39,17 @@ class XspecModel:
         self.models, self.pars = self._get_pars()
 
         # filter thawed parameters
-        self.thawedpars = []
+        self.thawedparams = []
         # thawed parameter indices in xspec format
         for modelname in self.models:
             thawed = [p for p in self.pars[modelname] if p.thawed]
-            self.thawedpars += thawed
+            self.thawedparams += thawed
 
     def xspec_thawed_idxs(self):
         """Return list of thawed parameter indices in xspec format."""
         return [
             ('' if p.model=='unnamed' else p.model+':')+str(p.index)
-            for p in self.thawedpars
+            for p in self.thawedparams
             ]
 
     def finish(self):
@@ -58,24 +59,6 @@ class XspecModel:
         for proc in self.procs:
             self.wait_finish()
         del self.procs[:]
-
-    def log_norms_priors(self, minnorm=1e-10):
-        """Modify priors on norms to be flat in log space."""
-
-        def getPrior(par):
-            def prior(v):
-                if v < par.minval or v > par.maxval:
-                    return -N.inf
-                return -N.log(v)
-            return prior
-
-        for par in self.thawedpars:
-            if par.name == 'norm':
-                print(' Using prior for log value on parameter %s:%s:%i' % (
-                        par.model, par.cmpt, par.index))
-
-                par.minval = max(par.minval, minnorm)
-                par.prior = getPrior(par)
 
     def _get_pars(self):
         """Get parameters from xcm file
@@ -172,6 +155,8 @@ class XspecModel:
                 thawed=thawed,
                 delta=delta,
                 sigma=sigma,
+                currentval=None,
+                xspecindex=self.xspecindex,
                 )
             pars.append(par)
         return pars
