@@ -17,7 +17,8 @@ class Par:
     def __repr__(self):
         out = []
         for k, v in sorted(self.__dict__.items()):
-            out.append('%s=%s' % (k, repr(v)))
+            if k != 'prior':
+                out.append('%s=%s' % (k, repr(v)))
         return '<Par(%s)>' % ', '.join(out)
 
     def _flatPrior(self, val):

@@ -62,10 +62,15 @@ def expand_systems(systems):
 def do_mcmc(xcms,
             nwalkers=100, nburn=100, niters=1000,
             systems=['localhost'],
-            outchain=['out.chain'], outhdf5='out.hdf5', debug=False,
-            continuerun=False, autosave=True,
-            nochdir=False, initialparameters=None,
-            lognorm=False, chunksize=4):
+            outchain=['out.chain'],
+            outhdf5='out.hdf5',
+            debug=False,
+            continuerun=False,
+            autosave=True,
+            nochdir=False,
+            initialparameters=None,
+            lognorm=False,
+            link=[]):
     """Do the actual MCMC process."""
 
     print("Loading XCM file(s)")
@@ -80,6 +85,11 @@ def do_mcmc(xcms,
     if lognorm:
         print("Using prior equivalent to log parameter")
         combmodel.log_norms_priors()
+
+    if link:
+        print("Linking parameters")
+        for expr in link:
+            combmodel.linkParameters(expr)
 
     if not initialparameters:
         print("Generating initial parameters")
@@ -238,6 +248,8 @@ def run():
                    help="Use priors equivalent to using log norms")
     p.add_argument('--chunk-size', metavar='N', type=int, default=4,
                    help='Currently ignored')
+    p.add_argument("--link", metavar="EXPR", action="append",
+                   help="Link two parameters in model")
 
     args = p.parse_args()
 
@@ -251,7 +263,7 @@ def run():
             outchain = ['emcee.chain.%i' % (i+1) for i in range(len(args.xcms))]
     else:
         if len(outchain) == 1 and '%' in outchain[0]:
-            outchain = [outchain % (i+1) for i in range(len(args.xcms))]
+            outchain = [outchain[0] % (i+1) for i in range(len(args.xcms))]
         else:
             if len(outchain) != len(args.xcms):
                 raise RuntimeError('Requires same number of output chains as input chains')
@@ -269,7 +281,7 @@ def run():
         nochdir = args.no_chdir,
         initialparameters = args.initial_parameters,
         lognorm = args.log_norm,
-        chunksize = args.chunk_size,
+        link = args.link,
     )
 
     print("Done")

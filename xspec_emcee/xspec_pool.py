@@ -44,6 +44,55 @@ class CombinedModel:
         for par, val in itertools.izip(self.thawedparams, vals):
             par.currentval = val
 
+    def linkParameters(self, linkexpr):
+        """Link two parameters.
+
+        Form is
+        [xcmindex1:][[modelname1]:]paramindex1 = [xcmindex2:][[modelname2]:]paramindex2
+
+        Default xcmindex is 1 and default modelname is unnamed
+        """
+
+        def defpart(t):
+            p = t.split(':')
+            if len(p) > 3:
+                raise RuntimeError('Parameter expression should have at most 3 parts')
+            elif len(p) == 2:
+                p = [1] + p
+            elif len(p) == 1:
+                p = [1, 'unnamed'] + p
+            p[0] = int(p[0])
+            p[1] = p[1].strip() if p[1].strip() else 'unnamed'
+            p[2] = int(p[2])
+            return p
+
+        def findindex(params, modname, paramindex):
+            for i, p in enumerate(params):
+                if p.model == modname and p.index == paramindex:
+                    return i
+            raise RuntimeError('Cannot find parameter', modname, paramindex)
+
+        left, right = linkexpr.split('=')
+        left, right = defpart(left), defpart(right)
+
+        print(" Linked parameter %i:%s:%i to %i:%s:%i" % tuple(right+left))
+
+        # get xspec models
+        lxmodel = self.xspecmodels[left[0]-1]
+        rxmodel = self.xspecmodels[right[0]-1]
+
+        # get parameter indices
+        lthaw, rthaw = lxmodel.thawedparams, rxmodel.thawedparams
+        lidx = findindex(lthaw, left[1], left[2])
+        ridx = findindex(rthaw, right[1], right[2])
+        lp, rp = lthaw[lidx], rthaw[lidx]
+        print("  (%s:%s:%s:%s -> %s:%s:%s:%s)" % (
+                right[0], rp.model, rp.cmpt, rp.name,
+                left[0], lp.model, lp.cmpt, lp.name))
+
+        # assign right parameter to left model
+        lthaw[lidx] = rthaw[ridx]
+
 class XspecPool:
     def __init__(self, combmodel):
         """Fake pool object to return likelihoods for parameter sets."""
