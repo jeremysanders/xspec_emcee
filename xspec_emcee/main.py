@@ -89,7 +89,7 @@ def do_mcmc(xcms,
     if link:
         print("Linking parameters")
         for expr in link:
-            combmodel.linkParameters(expr)
+            combmodel.link_parameters(expr)
 
     print("Number of free parameters: %i\n" % len(combmodel.thawedparams))
 
@@ -206,7 +206,7 @@ def write_xspec_chains(filenames, chain, lnprob, combmodel):
 
             # then the iterations
             for params, stat in itertools.izip(chainw, statw):
-                combmodel.updateParams(params)
+                combmodel.update_param_vals(params)
                 vals = [p.currentval for p in xmodel.thawedparams]
                 line = fmt % tuple(vals) + '\t' + '%g' % stat + '\n'
                 chainf.write(line)

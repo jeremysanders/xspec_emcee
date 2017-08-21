@@ -46,12 +46,12 @@ class CombinedModel:
         return sum((par.prior(val)
                     for par, val in itertools.izip(self.thawedparams, vals)))
 
-    def updateParams(self, vals):
+    def update_param_vals(self, vals):
         """Update thawed parameters with model parameters."""
         for par, val in itertools.izip(self.thawedparams, vals):
             par.currentval = val
 
-    def linkParameters(self, linkexpr):
+    def link_parameters(self, linkexpr):
         """Link two parameters.
 
         Form is
@@ -143,7 +143,7 @@ class ProcState:
         paridx = self.toprocess.pop()
         paramset = self.paramlist[paridx]
 
-        self.combmodel.updateParams(paramset)
+        self.combmodel.update_param_vals(paramset)
 
         # build up newpar command to send to xspec
         modparams = defaultdict(list)
