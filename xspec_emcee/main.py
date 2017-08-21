@@ -91,6 +91,8 @@ def do_mcmc(xcms,
         for expr in link:
             combmodel.linkParameters(expr)
 
+    print("Number of free parameters: %i\n" % len(combmodel.thawedparams))
+
     if not initialparameters:
         print("Generating initial parameters")
         p0 = gen_initial_parameters(combmodel.thawedparams, nwalkers)

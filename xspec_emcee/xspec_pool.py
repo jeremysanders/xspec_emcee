@@ -12,9 +12,16 @@ class CombinedModel:
 
     def __init__(self, xspecmodels):
         self.xspecmodels = xspecmodels
+        self.update_thawed()
+
+    def update_thawed(self):
+        existing = set()
         self.thawedparams = []
-        for model in xspecmodels:
-            self.thawedparams += model.thawedparams
+        for model in self.xspecmodels:
+            for tp in model.thawedparams:
+                if tp not in existing:
+                    self.thawedparams.append(tp)
+                    existing.add(tp)
 
     def log_norms_priors(self, minnorm=1e-10):
         """Modify priors on norms to be flat in log space."""
@@ -93,6 +100,88 @@ class CombinedModel:
         # assign right parameter to left model
         lthaw[lidx] = rthaw[ridx]
 
+        self.update_thawed()
+
+class ProcState:
+    """This object is for handling the processing state for a set of
+    XspecModel objects."""
+
+    def __init__(self, combmodel, xmodel, paramlist, likes, toprocess):
+        self.combmodel = combmodel
+        self.xmodel = xmodel
+        self.paramlist = paramlist
+        self.likes = likes
+        self.toprocess = list(toprocess)
+
+        # map fileno to xspec process
+        self.fileno_to_proc = {x.fileno(): x for x in xmodel.procs}
+
+        # fileno which are free to process
+        self.free = list(self.fileno_to_proc.keys())
+
+        # filenos which are doing work
+        self.processing = {}
+
+    def _check(self):
+        """Check whether processes have returned results and get them."""
+
+        # iterate over processes which have written to stdout
+        for fileno in select.select(list(self.processing.keys()), [], [])[0]:
+            proc = self.fileno_to_proc[fileno]
+            result = proc.read_buffer()
+            if result is not None:
+                # valid result, so get likelihood
+                like = -0.5*float(result)
+                self.likes[self.processing[fileno]] += like
+
+                # free up process for next job
+                self.free.append(fileno)
+                del self.processing[fileno]
+
+    def _send_job(self):
+        """Send the next job to process."""
+        paridx = self.toprocess.pop()
+        paramset = self.paramlist[paridx]
+
+        self.combmodel.updateParams(paramset)
+
+        # build up newpar command to send to xspec
+        modparams = defaultdict(list)
+        for param in self.xmodel.thawedparams:
+            mpm = modparams[param.model]
+            while len(mpm) < param.index-1:
+                mpm.append('')
+            mpm.append('%e' % param.currentval)
+        # newpar command for each model
+        cmds = []
+        for model, pars in modparams.iteritems():
+            cmd = 'newpar %s1-%i & %s' % (
+                '' if model == 'unnamed' else model+':',
+                len(pars), ' & '.join(pars))
+            cmds.append(cmd)
+        # command to get output statistic
+        cmds.append('emcee_tcloutr stat')
+
+        fileno = self.free.pop()
+        proc = self.fileno_to_proc[fileno]
+        proc.send_cmd('\n'.join(cmds))
+        self.processing[fileno] = paridx
+
+    def loop_iter(self):
+        """Does a cycle of starting new jobs and getting the results
+        of old ones.
+
+        Returns None if none left."""
+
+        if self.free and self.toprocess:
+            self._send_job()
+
+        elif self.processing:
+            # check for a completed process
+            self._check()
+
+        return not self.toprocess and not self.processing
+
 class XspecPool:
     def __init__(self, combmodel):
         """Fake pool object to return likelihoods for parameter sets."""
@@ -109,17 +198,28 @@ class XspecPool:
         Note: dummyfunc is never called!
         """
 
-        # first get priors
-        priors = N.array([self.combmodel.prior(v) for v in paramlist])
+        # get prior for initial likelihood
+        likes = N.array([self.combmodel.prior(v) for v in paramlist])
+        # list of parameters with finite priors
+        toprocess = list(N.nonzero(N.isfinite(likes))[0])
 
-        # this mask is those parameters which have a finite prior
-        mask = N.isfinite(priors)
+        #notfinite = ~N.isfinite(likes)
+        #for i in N.nonzero(notfinite)[0]:
+        #    print(paramlist[i])
 
-        # add model likelihoods to priors
-        likes = priors
-        for xmodel in self.combmodel.xspecmodels:
-            innerlikes = self._mapinner(xmodel, mask, paramlist)
-            likes += innerlikes
+        # each xspecmodel has a processing state for each of the parameters
+        states = [
+            ProcState(self.combmodel, xmodel, paramlist, likes, toprocess)
+            for xmodel in self.combmodel.xspecmodels
+            ]
+
+        while True:
+            alldone = True
+            for state in states:
+                done = state.loop_iter()
+                alldone = alldone and done
+            if alldone:
+                break
 
         likefilt = likes[N.isfinite(likes)]
         if len(likefilt) > 0 and self.itercount % 2 == 0:
@@ -131,71 +231,5 @@ class XspecPool:
                     len(likefilt), len(likes),
                     ))
         self.itercount += 1
-
-        return likes
-
-    def _mapinner(self, xmodel, mask, paramlist):
-
-        fileno_to_proc = {x.fileno(): x for x in xmodel.procs}
-
-        # file numbers of processes doing nothing
-        free = list(fileno_to_proc.keys())
-        # map file numbers of processes working on data to output index
-        processing = {}
-
-        # indices of parameters to be processed
-        toprocess = list(N.nonzero(mask)[0])
-
-        # output likelihoods
-        likes = N.zeros(len(paramlist), dtype=N.float64)
-
-        def check():
-            for fileno in select.select(list(processing.keys()), [], [])[0]:
-                proc = fileno_to_proc[fileno]
-                result = proc.read_buffer()
-                if result is not None:
-                    # return likelihood
-                    like = -0.5*float(result)
-                    likes[processing[fileno]] = like
-                    # free up process for next job
-                    free.append(fileno)
-                    del processing[fileno]
-
-        while toprocess:
-            if free:
-                paridx = toprocess.pop()
-                paramset = paramlist[paridx]
-
-                self.combmodel.updateParams(paramset)
-
-                # build up newpar command to send to xspec
-                modparams = defaultdict(list)
-                for param in xmodel.thawedparams:
-                    mpm = modparams[param.model]
-                    while len(mpm) < param.index-1:
-                        mpm.append('')
-                    mpm.append('%e' % param.currentval)
-                # newpar command for each model
-                cmds = []
-                for model, pars in modparams.iteritems():
-                    cmd = 'newpar %s1-%i & %s' % (
-                        '' if model == 'unnamed' else model+':',
-                        len(pars), ' & '.join(pars))
-                    cmds.append(cmd)
-                # command to get output statistic
-                cmds.append('emcee_tcloutr stat')
-
-                fileno = free.pop()
-                proc = fileno_to_proc[fileno]
-                proc.send_cmd('\n'.join(cmds))
-                processing[fileno] = paridx
-
-            else:
-                # check for a completed process
-                check()
-
-        # wait for final completion
-        while processing:
-            check()
 
         return likes
