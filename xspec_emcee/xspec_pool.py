@@ -126,7 +126,9 @@ class ProcState:
         """Check whether processes have returned results and get them."""
 
         # iterate over processes which have written to stdout
-        for fileno in select.select(list(self.processing.keys()), [], [])[0]:
+        for fileno in select.select(
+            list(self.processing.keys()), [], [], 0.01)[0]:
+
             proc = self.fileno_to_proc[fileno]
             result = proc.read_buffer()
             if result is not None:
@@ -171,9 +173,10 @@ class ProcState:
         """Does a cycle of starting new jobs and getting the results
         of old ones.
 
-        Returns None if none left."""
+        Returns True if eveything done."""
 
         if self.free and self.toprocess:
+            # send next job
             self._send_job()
 
         elif self.processing:

@@ -71,8 +71,14 @@ class XspecModel:
         # initial fit required to get sigma values
         self.procs[0].send_cmd('fit')
 
+        # get list of models from tclout model
+        models = ['unnamed']
         xmodel = self.procs[0].tclout('model')
-        models = ['unnamed'] + re.findall('([A-Za-z0-9]+):', xmodel)
+        for mod in re.findall('([A-Za-z0-9]+):', xmodel):
+            if mod not in models:
+                # xspec bug where with multiple datagroups, models are
+                # repeated
+                models.append(mod)
 
         # get model component information
         model_pars = {}
