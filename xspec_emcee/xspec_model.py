@@ -76,8 +76,7 @@ class XspecModel:
         xmodel = self.procs[0].tclout('model')
         for mod in re.findall('([A-Za-z0-9]+):', xmodel):
             if mod not in models:
-                # xspec bug where with multiple datagroups, models are
-                # repeated
+                # with multiple datagroups, models are repeated
                 models.append(mod)
 
         # get model component information
