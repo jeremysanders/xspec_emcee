@@ -1,6 +1,5 @@
 from __future__ import print_function, division, absolute_import
 
-import itertools
 import select
 from collections import defaultdict
 
@@ -44,11 +43,11 @@ class CombinedModel:
     def prior(self, vals):
         """Calculate total prior for parameters."""
         return sum((par.prior(val)
-                    for par, val in itertools.izip(self.thawedparams, vals)))
+                    for par, val in zip(self.thawedparams, vals)))
 
     def update_param_vals(self, vals):
         """Update thawed parameters with model parameters."""
-        for par, val in itertools.izip(self.thawedparams, vals):
+        for par, val in zip(self.thawedparams, vals):
             par.currentval = val
 
     def link_parameters(self, linkexpr):
@@ -156,7 +155,7 @@ class ProcState:
             mpm.append('%e' % param.currentval)
         # newpar command for each model
         cmds = []
-        for model, pars in modparams.iteritems():
+        for model, pars in modparams.items():
             cmd = 'newpar %s1-%i & %s' % (
                 '' if model == 'unnamed' else model+':',
                 len(pars), ' & '.join(pars))

@@ -13,7 +13,6 @@ import sys
 import argparse
 import time
 import re
-import itertools
 
 import h5py
 import numpy as N
@@ -25,7 +24,7 @@ from .xspec_pool import XspecPool, CombinedModel
 def gen_initial_parameters(parameters, nwalkers):
     """Construct list of initial parameter values for each walker."""
     p0 = []
-    for walker in xrange(nwalkers):
+    for walker in range(nwalkers):
         pwalker = []
         # for each walker, use initial parameters based on parameter
         # and delta parameter
@@ -36,7 +35,7 @@ def gen_initial_parameters(parameters, nwalkers):
                 # use sigma if delta is badly adjusted
                 width = swidth
 
-            for i in xrange(10000):
+            for i in range(10000):
                 v = N.random.normal(par.initval, width)
                 if N.isfinite(par.prior(v)):
                     pwalker.append(v)
@@ -189,7 +188,7 @@ def write_xspec_chains(filenames, chain, lnprob, combmodel):
 
         # header for contents of file
         hdr = []
-        for par, idx in itertools.izip(
+        for par, idx in zip(
             xmodel.thawedparams, xmodel.xspec_thawed_idxs()):
             hdr.append("%s %s %s" % (
                     idx, par.name,
@@ -200,12 +199,12 @@ def write_xspec_chains(filenames, chain, lnprob, combmodel):
         fmt = '\t'.join(['%g']*len(xmodel.thawedparams))
 
         # write each walker separately
-        for wi in xrange(nwalkers):
+        for wi in range(nwalkers):
             chainw = chain[wi, :, :]
             statw = lnprob[wi, :]
 
             # then the iterations
-            for params, stat in itertools.izip(chainw, statw):
+            for params, stat in zip(chainw, statw):
                 combmodel.update_param_vals(params)
                 vals = [p.currentval for p in xmodel.thawedparams]
                 line = fmt % tuple(vals) + '\t' + '%g' % stat + '\n'
