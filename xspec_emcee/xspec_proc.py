@@ -42,7 +42,9 @@ class XspecProc:
 
         cmd = [start_xspec, system]
         popen = subprocess.Popen(
-            cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            universal_newlines=True, bufsize=1,
+        )
 
         # load helper routines
         popen.stdin.write('source %s\n' % xspec_helpers)
@@ -78,7 +80,7 @@ class XspecProc:
 
         If there is a result in the buffer, then return string value
         """
-        self.buffer += os.read(self.popen.stdout.fileno(), 8192)
+        self.buffer += os.read(self.popen.stdout.fileno(), 8192).decode('utf8')
         match = result_re.search(self.buffer)
         if match:
             result = match.group(1)
