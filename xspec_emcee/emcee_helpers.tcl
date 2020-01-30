@@ -21,6 +21,17 @@ proc emcee_tcloutr { args } {
     puts "$HSTART$res$HEND"
 }
 
+# get parameters
+proc emcee_pars { } {
+    global HSTART HEND
+    set c [tcloutr chatter]
+    chatter 10
+    puts "$HSTART"
+    show parameters
+    puts "$HEND"
+    eval chatter $c
+}
+
 # get statistic
 proc emcee_statistic { } {
     global HSTART HEND

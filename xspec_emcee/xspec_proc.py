@@ -68,6 +68,7 @@ class XspecProc:
         popen.stdin.write('emcee_startup\n')
         if not debug:
             popen.stdin.write('emcee_loop\n')
+
         return popen
 
     def send_cmd(self, cmd):

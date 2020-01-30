@@ -68,101 +68,90 @@ class XspecModel:
         list of Par objects. 'unnamed' is the main xspec model.
         """
 
+        print('Initial fit...')
         # initial fit required to get sigma values
         self.procs[0].send_cmd('fit')
 
-        # get list of models from tclout model
-        models = ['unnamed']
-        xmodel = self.procs[0].tclout('model')
-        for mod in re.findall('([A-Za-z0-9]+):', xmodel):
-            if mod not in models:
-                # with multiple datagroups, models are repeated
-                models.append(mod)
+        models = []
+        modelpars = {}
 
-        # get model component information
-        model_pars = {}
-        for model in models:
-            model_pars[model] = self._get_model_pars(model)
+        print('Interrogating model...')
+        freepars = self.procs[0].single_cmd('emcee_pars')
+        modname = None
+        for line in freepars.split('\n'):
+            # look for line "Model name:...Active/On"
+            m = re.match(r'^\s*Model ([0-9A-Za-z_]+):.+Active/On$', line)
+            if m:
+                modname = m.group(1)
+                models.append(modname)
+                modelpars[modname] = []
+            else:
+                # look for line "Model ...Active/On" (default unnamed model)
+                m = re.match(r'^\s*Model .+Active/On$', line)
+                if m:
+                    modname = 'unnamed'
+                    models.append(modname)
+                    modelpars[modname] = []
+                else:
+                    # look for parameter 1 2 name
+                    m = re.match(r'^\s*([0-9]+)\s+([0-9]+)\s+([A-Za-z0-9_]+).*$', line)
+                    if m:
+                        par = self._handle_par(modname, int(m.group(1)), m.group(3))
+                        modelpars[modname].append(par)
 
-        return models, model_pars
+        if not models or not modelpars:
+            raise RuntimeError('Could not find model in xcm file')
 
-    def _get_model_pars(self, model):
-        """Get parameters for model given.
+        print("Done.")
+        print("Obtained %i model(s):" % len(models))
+        for mod in models:
+            numpars = len(modelpars[mod])
+            numthawed = len([p for p in modelpars[mod] if p.thawed])
+            print("  Model '%s', %i parameter(s), %i thawed" % (mod, numpars, numthawed))
 
-        xspec supports multiple models
-        model is unnamed or model name
-        """
+        return models, modelpars
+
+    def _handle_par(self, modname, paridx, cmptname):
+        """Take modelname, parameter index and component name, and return parameter Par.,"""
 
         p0 = self.procs[0]
-        bmodel = '' if model=='unnamed' else model
-        ncmpt = int(p0.tclout('modcomp %s' % bmodel))
-        ndgrp = int(p0.tclout('datagrp'))
+        mprefix = '' if modname=='unnamed' else modname+':'
+        parinfo = p0.tclout('pinfo %s%i' % (mprefix, paridx)).split()
+        linked = p0.tclout('plink %s%i' % (mprefix, paridx))[:1] == 'T'
 
-        cmptmodelidx = 1
-        pars = []
-        # iterate over data groups
-        for dgrp in range(ndgrp):
-            # iterate over components in data group
-            for cmpt in range(ncmpt):
-                pars += self._get_cmpt_pars(model, dgrp, cmpt, cmptmodelidx)
-                cmptmodelidx += 1
-        return pars
+        # parameter value, range, etc
+        pvals = [
+            float(x) for x in
+            p0.tclout('param %s%i' % (mprefix, paridx)).split() ]
 
-    def _get_cmpt_pars(self, model, dgrp, cmpt, cmptmodelidx):
-        """Get parameters associated with model, datagroup and component.
+        if len(pvals) == 1:
+            # switch parameter
+            minval = maxval = delta = None
+            thawed = False
+        else:
+            thawed = pvals[1] > 0 and not linked
+            minval, maxval, delta = pvals[2], pvals[5], pvals[1]
 
-        cmptmodelidx is a numerical index which goes into the component
-        name, counting inside the model."""
+        if thawed:
+            sigma = float(p0.tclout('sigma %s%i' % (mprefix, paridx)))
+        else:
+            sigma = 0.
 
-        p0 = self.procs[0]
-        cmodel = '' if model=='unnamed' else model+':'
-        cmptinfo = p0.tclout(
-            'compinfo %s%i %i' % (cmodel, cmpt+1, dgrp+1)).split()
-        startpar, npars = int(cmptinfo[1]), int(cmptinfo[2])
-        cmptname = '%s<%i>' % (cmptinfo[0], cmptmodelidx)
+        par = Par(
+            name=parinfo[0],
+            unit='' if len(parinfo)==1 else parinfo[1],
+            cmpt=cmptname,
+            model=modname,
+            index=paridx,
+            initval=pvals[0],
+            minval=minval,
+            maxval=maxval,
+            linked=linked,
+            thawed=thawed,
+            delta=delta,
+            sigma=sigma,
+            currentval=None,
+            xspecindex=self.xspecindex,
+        )
+        return par
 
-        pars = []
-        # iterate over parameters in component
-        for paridx in range(startpar, startpar+npars):
-            # name and unit
-            parinfo = p0.tclout('pinfo %s%i' % (cmodel, paridx)).split()
-
-            # is model linked?
-            linked = p0.tclout('plink %s%i' % (cmodel, paridx))[:1] == 'T'
-
-            # parameter value, range, etc
-            pvals = [
-                float(x) for x in
-                p0.tclout('param %s%i' % (cmodel, paridx)).split() ]
-
-            if len(pvals) == 1:
-                # switch parameter
-                minval = maxval = delta = None
-                thawed = False
-            else:
-                thawed = pvals[1] > 0 and not linked
-                minval, maxval, delta = pvals[2], pvals[5], pvals[1]
-
-            if thawed:
-                sigma = float(p0.tclout('sigma %s%i' % (cmodel, paridx)))
-            else:
-                sigma = 0.
-
-            par = Par(
-                name=parinfo[0],
-                unit='' if len(parinfo)==1 else parinfo[1],
-                cmpt=cmptname,
-                model=model,
-                index=paridx,
-                initval=pvals[0],
-                minval=minval,
-                maxval=maxval,
-                linked=linked,
-                thawed=thawed,
-                delta=delta,
-                sigma=sigma,
-                currentval=None,
-                xspecindex=self.xspecindex,
-                )
-            pars.append(par)
-        return pars
