@@ -77,8 +77,8 @@ def do_mcmc(xcms,
     for i, xcm in enumerate(xcms):
         print(' Loading', xcm)
         xmodels.append( XspecModel(
-                xcm, expand_systems(systems), debug=debug, nochdir=nochdir,
-                xspecindex=i+1 ))
+            xcm, expand_systems(systems), debug=debug, nochdir=nochdir,
+            xspecindex=i+1 ))
     combmodel = CombinedModel(xmodels)
 
     if lognorm:
@@ -90,7 +90,7 @@ def do_mcmc(xcms,
         for expr in link:
             combmodel.link_parameters(expr)
 
-    print("Number of free parameters: %i\n" % len(combmodel.thawedparams))
+    print("Total number of free parameters: %i\n" % len(combmodel.thawedparams))
 
     if not initialparameters:
         print("Generating initial parameters")
