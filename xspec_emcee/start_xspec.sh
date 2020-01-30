@@ -6,7 +6,7 @@
 # $1 = name of system
 
 host=$1
-if [ $host == localhost ]; then
+if [ $host = localhost ]; then
     # avoid using ssh if running ssh on local machine
     exec xspec
 else
