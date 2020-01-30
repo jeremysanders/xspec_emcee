@@ -21,6 +21,11 @@ proc emcee_tcloutr { args } {
     puts "$HSTART$res$HEND"
 }
 
+proc emcee_wait { args } {
+    global HSTART HEND
+    puts "$HSTART$HEND"
+}
+
 # get parameters
 proc emcee_pars { } {
     global HSTART HEND

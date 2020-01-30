@@ -103,6 +103,10 @@ class XspecProc:
         """Shortcut to get tclout results."""
         return self.single_cmd('emcee_tcloutr ' + args)
 
+    def wait(self):
+        """Wait until xspec is ready."""
+        self.single_cmd('emcee_wait')
+
     def send_finish(self):
         """Tell subprocess to finish."""
         self.send_cmd('quit')

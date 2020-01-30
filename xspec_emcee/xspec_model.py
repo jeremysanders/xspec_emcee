@@ -68,36 +68,41 @@ class XspecModel:
         list of Par objects. 'unnamed' is the main xspec model.
         """
 
+        self.procs[0].wait()
         print('Initial fit...')
         # initial fit required to get sigma values
         self.procs[0].send_cmd('fit')
+        self.procs[0].wait()
 
         models = []
         modelpars = {}
 
         print('Interrogating model...')
-        freepars = self.procs[0].single_cmd('emcee_pars')
+        pars = self.procs[0].single_cmd('emcee_pars')
         modname = None
-        for line in freepars.split('\n'):
+        for line in pars.split('\n'):
             # look for line "Model name:...Active/On"
             m = re.match(r'^\s*Model ([0-9A-Za-z_]+):.+Active/On$', line)
             if m:
                 modname = m.group(1)
                 models.append(modname)
                 modelpars[modname] = []
-            else:
-                # look for line "Model ...Active/On" (default unnamed model)
-                m = re.match(r'^\s*Model .+Active/On$', line)
-                if m:
-                    modname = 'unnamed'
-                    models.append(modname)
-                    modelpars[modname] = []
-                else:
-                    # look for parameter 1 2 name
-                    m = re.match(r'^\s*([0-9]+)\s+([0-9]+)\s+([A-Za-z0-9_]+).*$', line)
-                    if m:
-                        par = self._handle_par(modname, int(m.group(1)), m.group(3))
-                        modelpars[modname].append(par)
+                continue
+
+            # look for line "Model ...Active/On" (default unnamed model)
+            m = re.match(r'^\s*Model .+Active/On$', line)
+            if m:
+                modname = 'unnamed'
+                models.append(modname)
+                modelpars[modname] = []
+                continue
+
+            # look for parameter 1 2 name
+            m = re.match(r'^\s*([0-9]+)\s+([0-9]+)\s+([A-Za-z0-9_]+).*$', line)
+            if m:
+                par = self._handle_par(modname, int(m.group(1)), m.group(3))
+                modelpars[modname].append(par)
+                continue
 
         if not models or not modelpars:
             raise RuntimeError('Could not find model in xcm file')
