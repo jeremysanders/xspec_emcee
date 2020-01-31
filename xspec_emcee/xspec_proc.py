@@ -52,7 +52,7 @@ class XspecProc:
         if debug:
             popen.stdin.write(
                 'set logfile '
-                '$env(HOME)/xspec.log.[info hostname].[pid]\n')
+                'xspec-emcee.log.[info hostname].[pid]\n')
             popen.stdin.write('file delete $logfile\n')
             popen.stdin.write('log $logfile\n')
             popen.stdin.write('set EMCEE_DEBUG 1\n')
