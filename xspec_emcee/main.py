@@ -149,8 +149,10 @@ def do_mcmc(xcms,
     index = start
     try:
         for p, l, s in sampler.sample(
-            pos, rstate0=state, storechain=False,
-            iterations=niters-start):
+                pos,
+                rstate0=state,
+                store=False,
+                iterations=niters-start):
 
             chain[:, index, :] = p
             lnprob[:, index] = l
