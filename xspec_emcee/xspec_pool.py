@@ -200,6 +200,9 @@ class XspecPool:
         Note: dummyfunc is never called!
         """
 
+        # convert generator->list
+        paramlist = list(paramlist)
+
         # get prior for initial likelihood
         likes = N.array([self.combmodel.prior(v) for v in paramlist])
         # list of parameters with finite priors
