@@ -30,8 +30,9 @@ class Par:
 class XspecModel:
     """Handle multiple Xspec processes and model."""
 
-    def __init__(self, xcm, systems, debug=False, nochdir=False, xspecindex=-1):
+    def __init__(self, xcm, systems, debug=False, nochdir=False, xspecindex=-1, nofit=False):
 
+        self.nofit = nofit
         self.xspecindex = xspecindex
         self.procs = [
             XspecProc(xcm, system, debug=debug, nochdir=nochdir)
@@ -69,10 +70,11 @@ class XspecModel:
         """
 
         self.procs[0].wait()
-        print('Initial fit...')
-        # initial fit required to get sigma values
-        self.procs[0].send_cmd('fit')
-        self.procs[0].wait()
+        if not self.nofit:
+            print('Initial fit...')
+            # initial fit to get sigma values
+            self.procs[0].send_cmd('fit')
+            self.procs[0].wait()
 
         models = []
         modelpars = {}

@@ -84,18 +84,22 @@ optional arguments:
   --niters N            Number of iterations (default: 5000)
   --nburn N             Number of burn iterations (default: 500)
   --nwalkers N          Number of walkers (default: 50)
-  --systems LIST        Space separated list of systems to run on (default:
+  --systems LIST        Space-separated list of computers to run on (default:
                         localhost)
   --output-hdf5 FILE    Output HDF5 file (default: emcee.hdf5)
-  --output-chain FILE   Output text file (default: emcee.chain)
+  --output-chain FILE   Output text file (default: None)
   --continue-run        Continue from an existing chain (in HDF5) (default:
                         False)
-  --debug               Create xspec log files (default: False)
-  --no-chdir            Do not chdir to xcm file directory before execution
+  --no-fit              Disable fit after loading model (default: False)
+  --debug               Create Xspec log files (default: False)
+  --no-chdir            Do not chdir to XCM file directory before execution
                         (default: False)
   --initial-parameters FILE
                         Provide initial parameters (default: None)
-  --log-norm            log norm values during MCMC (default: False)
+  --log-norm            Use priors equivalent to using log norms (default:
+                        False)
+  --chunk-size N        Currently ignored (default: 4)
+  --link EXPR           Link two parameters in model (default: None)
 
 TODO:
  - Use local xspec to find remote xspecs automatically?

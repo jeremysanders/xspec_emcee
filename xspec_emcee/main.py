@@ -65,6 +65,7 @@ def do_mcmc(xcms,
             outhdf5='out.hdf5',
             debug=False,
             continuerun=False,
+            nofit=False,
             autosave=True,
             nochdir=False,
             initialparameters=None,
@@ -77,8 +78,13 @@ def do_mcmc(xcms,
     for i, xcm in enumerate(xcms):
         print(' Loading', xcm)
         xmodels.append( XspecModel(
-            xcm, expand_systems(systems), debug=debug, nochdir=nochdir,
-            xspecindex=i+1 ))
+            xcm,
+            expand_systems(systems),
+            debug=debug,
+            nochdir=nochdir,
+            nofit=nofit,
+            xspecindex=i+1,
+        ) )
     combmodel = CombinedModel(xmodels)
 
     if lognorm:
@@ -241,6 +247,8 @@ def run():
                    help="Output text file")
     p.add_argument("--continue-run",  action="store_true", default=False,
                    help="Continue from an existing chain (in HDF5)")
+    p.add_argument("--no-fit",  action="store_true", default=False,
+                   help="Disable fit after loading model")
     p.add_argument("--debug", action="store_true", default=False,
                    help="Create Xspec log files")
     p.add_argument("--no-chdir", action="store_true", default=False,
@@ -280,6 +288,7 @@ def run():
         outchain = outchain,
         outhdf5 = args.output_hdf5,
         continuerun = args.continue_run,
+        nofit = args.no_fit,
         debug = args.debug,
         nochdir = args.no_chdir,
         initialparameters = args.initial_parameters,
